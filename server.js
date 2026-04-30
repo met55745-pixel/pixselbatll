@@ -20,3 +20,26 @@ const PORT = process.env.PORT || 3000;
 http.listen(PORT, () => {
     console.log('Server is running on port ' + PORT);
 });
+const users = {}; // В реальности лучше использовать БД, но для начала хватит и этого
+
+io.on('connection', (socket) => {
+    
+    socket.on('auth_request', (data) => {
+        const { user, pass } = data;
+        
+        if (!users[user]) {
+            // Регистрация нового
+            users[user] = pass;
+            socket.emit('auth_success', { username: user });
+        } else {
+            // Проверка пароля
+            if (users[user] === pass) {
+                socket.emit('auth_success', { username: user });
+            } else {
+                socket.emit('auth_fail', "Неверный пароль для этого ника!");
+            }
+        }
+    });
+
+    // Твои старые обработчики paint_pixel и т.д.
+});
