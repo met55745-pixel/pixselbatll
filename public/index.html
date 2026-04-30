@@ -3,98 +3,57 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GeoMetka</title>
+    <title>GeoMetka | Pixel Battle</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
             --bg: #2f2f2f;
-            --panel: rgba(60, 60, 60, 0.8);
-            --text: #ffffff;
+            --panel: rgba(45, 45, 45, 0.9);
+            --text: #e0e0e0;
             --accent: #5dade2;
-            --border: rgba(255,255,255,0.1);
+            --border: rgba(255,255,255,0.05);
         }
 
-        .light-theme {
-            --bg: #e0e0e0;
-            --panel: rgba(255, 255, 255, 0.85);
-            --text: #2f2f2f;
-            --accent: #2980b9;
-            --border: rgba(0,0,0,0.1);
-        }
+        body, html { margin: 0; padding: 0; height: 100%; background: var(--bg); font-family: sans-serif; overflow: hidden; }
+        #map { height: 100vh; width: 100vw; z-index: 1; background: var(--bg); }
 
-        body, html { margin: 0; padding: 0; height: 100%; background: var(--bg); font-family: 'Segoe UI', system-ui, sans-serif; transition: background 0.3s; }
-        #map { height: 100vh; width: 100vw; z-index: 1; }
-
-        /* Окно Регистрации/Входа */
-        #auth-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8); z-index: 2000;
-            display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px);
-        }
-
-        .auth-card {
-            background: var(--bg); padding: 30px; border-radius: 20px;
-            width: 300px; text-align: center; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
-
-        .auth-card h2 { color: var(--text); margin-bottom: 20px; font-weight: 400; }
-
-        input {
-            width: 90%; padding: 12px; margin: 8px 0; border-radius: 10px;
-            border: 1px solid var(--border); background: var(--panel); color: var(--text); outline: none;
-        }
-
-        button.main-btn {
-            width: 100%; padding: 12px; margin-top: 15px; border-radius: 10px;
-            border: none; background: var(--accent); color: white; cursor: pointer; font-weight: bold;
-        }
-
-        /* Панели управления */
-        .ui-panel {
+        /* Панели */
+        .ui-card {
             position: absolute; z-index: 1000; background: var(--panel);
-            backdrop-filter: blur(10px); border-radius: 15px; border: 1px solid var(--border);
-            padding: 15px; color: var(--text); transition: 0.3s;
+            backdrop-filter: blur(10px); border-radius: 12px; border: 1px solid var(--border);
+            padding: 15px; color: var(--text); box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
 
-        .top-left { top: 20px; left: 20px; }
-        .bottom-center { bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 15px; }
+        .stats-box { top: 20px; left: 20px; width: 180px; }
+        .controls-box { bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 15px; }
 
-        .theme-toggle {
-            cursor: pointer; padding: 5px 10px; border-radius: 8px; background: var(--accent);
-            color: white; font-size: 12px; border: none; margin-bottom: 10px;
-        }
+        .label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--accent); margin-bottom: 5px; }
+        .val { font-size: 16px; font-weight: bold; }
 
-        .color-dot { width: 30px; height: 30px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
-        .color-dot.active { border-color: var(--text); }
+        .color-btn { width: 32px; height: 32px; border-radius: 8px; cursor: pointer; border: 2px solid transparent; transition: 0.2s; }
+        .color-btn.active { border-color: white; transform: scale(1.1); }
+
+        #leaderboard { margin-top: 10px; font-size: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
+        .leader-row { display: flex; justify-content: space-between; margin-bottom: 4px; opacity: 0.8; }
     </style>
 </head>
 <body>
 
-    <div id="auth-overlay">
-        <div class="auth-card">
-            <h2 id="auth-title">Вход в GeoMetka</h2>
-            <input type="text" id="username" placeholder="Никнейм">
-            <input type="password" id="password" placeholder="Пароль">
-            <button class="main-btn" onclick="authenticate()">Войти / Начать</button>
-            <p id="auth-msg" style="color: #e74c3c; font-size: 12px; margin-top: 10px;"></p>
-        </div>
-    </div>
-
-    <div class="ui-panel top-left">
-        <button class="theme-toggle" onclick="toggleTheme()">Сменить тему</button>
-        <div style="font-size: 12px; opacity: 0.7;">Онлайн: <span id="online-count">0</span></div>
-        <div id="leaderboard" style="margin-top: 10px; font-size: 13px;"></div>
+    <div class="ui-card stats-box">
+        <div class="label">В сети</div>
+        <div class="val" id="online-count">1</div>
+        <div id="leaderboard"></div>
     </div>
 
     <div id="map"></div>
 
-    <div class="ui-panel bottom-center">
-        <div class="color-dot" onclick="setBtnColor('#ff4757', this)" style="background: #ff4757;"></div>
-        <div class="color-dot" onclick="setBtnColor('#2ed573', this)" style="background: #2ed573;"></div>
-        <div class="color-dot" onclick="setBtnColor('#1e90ff', this)" style="background: #1e90ff;"></div>
+    <div class="ui-card controls-box">
+        <div class="color-btn active" onclick="pickColor('#ff4757', this)" style="background: #ff4757;"></div>
+        <div class="color-btn" onclick="pickColor('#2ed573', this)" style="background: #2ed573;"></div>
+        <div class="color-btn" onclick="pickColor('#1e90ff', this)" style="background: #1e90ff;"></div>
         <div style="border-left: 1px solid var(--border); padding-left: 15px;">
-            <div style="font-size: 10px; text-transform: uppercase;">Счет</div>
-            <div id="my-score" style="font-weight: bold; font-size: 18px;">0</div>
+            <div class="label">Твой счет</div>
+            <div class="val" id="my-score">0</div>
         </div>
     </div>
 
@@ -102,175 +61,81 @@
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        let userToken = null;
-        let myNick = "";
-        let currentColor = '#ff4757';
         const gridSize = 0.0004;
-
-        // Карта
-        const map = L.map('map', { zoomControl: false }).setView([66.53, 66.61], 15);
-        let tiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
-
-        function toggleTheme() {
-            document.body.classList.toggle('light-theme');
-            const isLight = document.body.classList.contains('light-theme');
-            map.removeLayer(tiles);
-            tiles = L.tileLayer(isLight 
-                ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
-                : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-            ).addTo(map);
-        }
-
-        function authenticate() {
-            const user = document.getElementById('username').value;
-            const pass = document.getElementById('password').value;
-            if(!user || !pass) return alert("Заполни все поля!");
-            
-            socket.emit('auth_request', { user, pass });
-        }
-
-        socket.on('auth_success', (data) => {
-            myNick = data.username;
-            document.getElementById('auth-overlay').style.display = 'none';
-        });
-
-        socket.on('auth_fail', (msg) => {
-            document.getElementById('auth-msg').innerText = msg;
-        });
-
-        // Остальная логика отрисовки...
-        socket.on('init_map', (data) => {
-            // Отрисовка клеток как раньше
-        });
-
-        map.on('click', (e) => {
-            if(!myNick) return;
-            const lat = Math.floor(e.latlng.lat / gridSize) * gridSize;
-            const lng = Math.floor(e.latlng.lng / gridSize) * gridSize;
-            const id = `${lat.toFixed(5)}_${lng.toFixed(5)}`;
-            socket.emit('paint_pixel', { id, color: currentColor, username: myNick });
-        });
-
-        function setBtnColor(c, el) {
-            currentColor = c;
-            document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
-            el.classList.add('active');
-        }const socket = io();
-        let myNick = "";
         let currentColor = '#ff4757';
-        const gridSize = 0.0004;
-        const pixels = {};
-        let localMapState = {}; // Локальная память карты для топа
+        let pixels = {};
+        let fullMapData = {};
 
-        // Инициализация карты
+        // 1. Генерируем уникальный ID игрока (шифровка без регистрации)
+        let myUID = localStorage.getItem('pixel_uid');
+        if (!myUID) {
+            myUID = 'ID-' + Math.random().toString(36).substr(2, 5).toUpperCase();
+            localStorage.setItem('pixel_uid', myUID);
+        }
+
+        // 2. Настройка карты
         const map = L.map('map', { zoomControl: false }).setView([66.53, 66.61], 15);
-        let tiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
 
-        // Смена темы
-        function toggleTheme() {
-            document.body.classList.toggle('light-theme');
-            const isLight = document.body.classList.contains('light-theme');
-            map.removeLayer(tiles);
-            tiles = L.tileLayer(isLight 
-                ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
-                : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-            ).addTo(map);
-        }
-
-        // Авторизация
-        function authenticate() {
-            const user = document.getElementById('username').value;
-            const pass = document.getElementById('password').value;
-            if(!user || !pass) return alert("Заполни все поля!");
-            socket.emit('auth_request', { user, pass });
-        }
-
-        socket.on('auth_success', (data) => {
-            myNick = data.username;
-            document.getElementById('auth-overlay').style.display = 'none';
-            
-            // Включаем GPS только ПОСЛЕ успешного входа
-            map.locate({watch: true, enableHighAccuracy: true});
-        });
-
-        socket.on('auth_fail', (msg) => {
-            document.getElementById('auth-msg').innerText = msg;
-        });
-
-        // Онлайн
-        socket.on('online_stats', (count) => {
-            document.getElementById('online-count').innerText = count;
-        });
-
-        // Отрисовка пикселя
+        // 3. Функции отрисовки
         function drawPixel(id, color, owner) {
             if (pixels[id]) map.removeLayer(pixels[id]);
             const [lat, lng] = id.split('_').map(Number);
             pixels[id] = L.rectangle([[lat, lng], [lat + gridSize, lng + gridSize]], {
-                color: color, fillColor: color, fillOpacity: 0.8, weight: 0
-            }).bindPopup(`Владелец: ${owner}`).addTo(map);
+                color: color, fillColor: color, fillOpacity: 0.7, weight: 0
+            }).bindPopup(`Игрок: ${owner}`).addTo(map);
         }
 
-        // Обновление топа
-        function updateLeaderboard() {
+        function updateUI() {
             const stats = {};
-            Object.values(localMapState).forEach(p => {
-                stats[p.owner] = (stats[p.owner] || 0) + 1;
-            });
+            Object.values(fullMapData).forEach(p => { stats[p.owner] = (stats[p.owner] || 0) + 1; });
             
-            const sorted = Object.entries(stats).sort((a,b) => b[1] - a[1]).slice(0, 5);
-            const html = sorted.map(([name, count]) => `
-                <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-                    <span>${name}</span><b>${count}</b>
-                </div>
-            `).join('');
+            // Топ 3
+            const sorted = Object.entries(stats).sort((a,b) => b[1] - a[1]).slice(0, 3);
+            document.getElementById('leaderboard').innerHTML = sorted.map(([id, count]) => 
+                `<div class="leader-row"><span>${id}</span><b>${count}</b></div>`).join('');
             
-            document.getElementById('leaderboard').innerHTML = html || '<div>Мир пуст...</div>';
-            
-            if (myNick) {
-                document.getElementById('my-score').innerText = stats[myNick] || 0;
-            }
+            document.getElementById('my-score').innerText = stats[myUID] || 0;
         }
 
-        // Загрузка карты при старте
+        // 4. Socket события
         socket.on('init_map', (data) => {
-            localMapState = data;
+            fullMapData = data;
             for (let id in data) drawPixel(id, data[id].color, data[id].owner);
-            updateLeaderboard();
+            updateUI();
         });
 
-        // Кто-то закрасил клетку
         socket.on('pixel_updated', (data) => {
-            localMapState[data.id] = { color: data.color, owner: data.username };
-            drawPixel(data.id, data.color, data.username);
-            updateLeaderboard(); // Пересчитываем топ
+            fullMapData[data.id] = { color: data.color, owner: data.uid };
+            drawPixel(data.id, data.color, data.uid);
+            updateUI();
         });
 
-        // GPS: когда телефон находит твою локацию
+        socket.on('online_stats', (count) => { document.getElementById('online-count').innerText = count; });
+
+        // 5. ГЕОЛОКАЦИЯ (GPS)
+        map.locate({watch: true, enableHighAccuracy: true});
         map.on('locationfound', (e) => {
-            if(!myNick) return; // Если не вошел - не красим
-            
             const lat = Math.floor(e.latlng.lat / gridSize) * gridSize;
             const lng = Math.floor(e.latlng.lng / gridSize) * gridSize;
             const id = `${lat.toFixed(5)}_${lng.toFixed(5)}`;
             
-            socket.emit('paint_pixel', { id, color: currentColor, username: myNick });
-            map.setView(e.latlng); // Камера следит за тобой
+            if (!fullMapData[id] || fullMapData[id].owner !== myUID) {
+                socket.emit('paint_pixel', { id, color: currentColor, uid: myUID });
+            }
         });
 
-        // Клик по карте (оставил на случай, если дома GPS тупит)
+        // 6. Клик (для теста)
         map.on('click', (e) => {
-            if(!myNick) return;
             const lat = Math.floor(e.latlng.lat / gridSize) * gridSize;
             const lng = Math.floor(e.latlng.lng / gridSize) * gridSize;
             const id = `${lat.toFixed(5)}_${lng.toFixed(5)}`;
-            socket.emit('paint_pixel', { id, color: currentColor, username: myNick });
+            socket.emit('paint_pixel', { id, color: currentColor, uid: myUID });
         });
 
-        // Выбор цвета
-        function setBtnColor(c, el) {
+        function pickColor(c, el) {
             currentColor = c;
-            document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
+            document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
             el.classList.add('active');
         }
     </script>
