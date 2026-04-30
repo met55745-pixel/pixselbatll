@@ -163,65 +163,13 @@
             }
             document.getElementById('my-score').innerText = count;
         }
-// ==========================================
-        // УЛЬТРА-GPS СИСТЕМА (HARD BINDING)
-        // ==========================================
-        
-        // Настройки для максимальной точности
-        const gpsOptions = {
-            watch: true, 
-            enableHighAccuracy: true, // Использовать GPS, а не Wi-Fi
-            maximumAge: 0,            // Не использовать кэшированную позицию
-            timeout: 5000             // Ждать сигнал не дольше 5 сек
-        };
 
-        map.locate(gpsOptions);
+        // GPS СИСТЕМА
+        map.locate({ watch: true, enableHighAccuracy: true, maximumAge: 1000 });
 
         map.on('locationfound', (e) => {
-            const { lat, lng, accuracy } = e.latlng;
-
-            // 1. ПРИВЯЗКА: Если маркер уже есть — жестко перемещаем его по GPS
-            if (myMarker) {
-                myMarker.setLatLng([lat, lng]);
-            } else {
-                // Если зашли первый раз — создаем маркер
-                myMarker = L.marker([lat, lng], {
-                    icon: L.divIcon({ className: 'my-marker', iconSize: [20, 20] }),
-                    zIndexOffset: 1000 // Всегда поверх других игроков
-                }).addTo(map);
-                
-                // При первом запуске центрируем камеру на тебе
-                map.setView([lat, lng], 17);
-            }
-
-            // 2. СИНХРОНИЗАЦИЯ: Отправляем именно эти координаты серверу
-            socket.emit('update_position', { 
-                uid: myUID, 
-                lat: lat, 
-                lng: lng, 
-                color: currentColor 
-            });
-
-            // 3. ЗАХВАТ: Красим клетку именно там, где стоит маркер
-            const gLat = Math.floor(lat / gridSize) * gridSize;
-            const gLng = Math.floor(lng / gridSize) * gridSize;
-            const pId = `${gLat.toFixed(5)}_${gLng.toFixed(5)}`;
-            
-            // Проверка, чтобы не спамить сервер, если стоим на месте
-            if (!fullMapData[pId] || fullMapData[pId].owner !== myUID) {
-                socket.emit('paint_pixel', { id: pId, color: currentColor, uid: myUID });
-            }
-
-            // Лог для отладки (видишь в консоли телефона)
-            console.log(`GPS точность: ${e.accuracy.toFixed(1)}м`);
-        });
-
-        // Если GPS потерялся — пробуем переподключиться
-        map.on('locationerror', (e) => {
-            console.error("GPS Error:", e.message);
-            // Через 3 секунды пробуем снова
-            setTimeout(() => map.locate(gpsOptions), 3000);
-        }
+            const lat = e.latlng.lat;
+            const lng = e.latlng.lng;
 
             if (!myMarker) {
                 myMarker = L.marker([lat, lng], {
