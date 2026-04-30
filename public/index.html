@@ -155,6 +155,123 @@
             currentColor = c;
             document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
             el.classList.add('active');
+        }const socket = io();
+        let myNick = "";
+        let currentColor = '#ff4757';
+        const gridSize = 0.0004;
+        const pixels = {};
+        let localMapState = {}; // Локальная память карты для топа
+
+        // Инициализация карты
+        const map = L.map('map', { zoomControl: false }).setView([66.53, 66.61], 15);
+        let tiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+
+        // Смена темы
+        function toggleTheme() {
+            document.body.classList.toggle('light-theme');
+            const isLight = document.body.classList.contains('light-theme');
+            map.removeLayer(tiles);
+            tiles = L.tileLayer(isLight 
+                ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+                : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+            ).addTo(map);
+        }
+
+        // Авторизация
+        function authenticate() {
+            const user = document.getElementById('username').value;
+            const pass = document.getElementById('password').value;
+            if(!user || !pass) return alert("Заполни все поля!");
+            socket.emit('auth_request', { user, pass });
+        }
+
+        socket.on('auth_success', (data) => {
+            myNick = data.username;
+            document.getElementById('auth-overlay').style.display = 'none';
+            
+            // Включаем GPS только ПОСЛЕ успешного входа
+            map.locate({watch: true, enableHighAccuracy: true});
+        });
+
+        socket.on('auth_fail', (msg) => {
+            document.getElementById('auth-msg').innerText = msg;
+        });
+
+        // Онлайн
+        socket.on('online_stats', (count) => {
+            document.getElementById('online-count').innerText = count;
+        });
+
+        // Отрисовка пикселя
+        function drawPixel(id, color, owner) {
+            if (pixels[id]) map.removeLayer(pixels[id]);
+            const [lat, lng] = id.split('_').map(Number);
+            pixels[id] = L.rectangle([[lat, lng], [lat + gridSize, lng + gridSize]], {
+                color: color, fillColor: color, fillOpacity: 0.8, weight: 0
+            }).bindPopup(`Владелец: ${owner}`).addTo(map);
+        }
+
+        // Обновление топа
+        function updateLeaderboard() {
+            const stats = {};
+            Object.values(localMapState).forEach(p => {
+                stats[p.owner] = (stats[p.owner] || 0) + 1;
+            });
+            
+            const sorted = Object.entries(stats).sort((a,b) => b[1] - a[1]).slice(0, 5);
+            const html = sorted.map(([name, count]) => `
+                <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                    <span>${name}</span><b>${count}</b>
+                </div>
+            `).join('');
+            
+            document.getElementById('leaderboard').innerHTML = html || '<div>Мир пуст...</div>';
+            
+            if (myNick) {
+                document.getElementById('my-score').innerText = stats[myNick] || 0;
+            }
+        }
+
+        // Загрузка карты при старте
+        socket.on('init_map', (data) => {
+            localMapState = data;
+            for (let id in data) drawPixel(id, data[id].color, data[id].owner);
+            updateLeaderboard();
+        });
+
+        // Кто-то закрасил клетку
+        socket.on('pixel_updated', (data) => {
+            localMapState[data.id] = { color: data.color, owner: data.username };
+            drawPixel(data.id, data.color, data.username);
+            updateLeaderboard(); // Пересчитываем топ
+        });
+
+        // GPS: когда телефон находит твою локацию
+        map.on('locationfound', (e) => {
+            if(!myNick) return; // Если не вошел - не красим
+            
+            const lat = Math.floor(e.latlng.lat / gridSize) * gridSize;
+            const lng = Math.floor(e.latlng.lng / gridSize) * gridSize;
+            const id = `${lat.toFixed(5)}_${lng.toFixed(5)}`;
+            
+            socket.emit('paint_pixel', { id, color: currentColor, username: myNick });
+            map.setView(e.latlng); // Камера следит за тобой
+        });
+
+        // Клик по карте (оставил на случай, если дома GPS тупит)
+        map.on('click', (e) => {
+            if(!myNick) return;
+            const lat = Math.floor(e.latlng.lat / gridSize) * gridSize;
+            const lng = Math.floor(e.latlng.lng / gridSize) * gridSize;
+            const id = `${lat.toFixed(5)}_${lng.toFixed(5)}`;
+            socket.emit('paint_pixel', { id, color: currentColor, username: myNick });
+        });
+
+        // Выбор цвета
+        function setBtnColor(c, el) {
+            currentColor = c;
+            document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
+            el.classList.add('active');
         }
     </script>
 </body>
