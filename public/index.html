@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pixel Battle SLH</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        #map { height: 100vh; width: 100vw; }
+        body { margin: 0; font-family: sans-serif; }
+        .ui { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1000; background: white; padding: 10px; border-radius: 10px; display: flex; gap: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
+        button { padding: 8px; border: none; border-radius: 5px; color: white; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div class="ui">
+        <input type="text" id="nick" placeholder="Твой ник" style="width: 80px;">
+        <button onclick="currentColor='#ff0000'" style="background: red;">Красный</button>
+        <button onclick="currentColor='#0000ff'" style="background: blue;">Синий</button>
+    </div>
+
+    <script>
+        const socket = io();
+        let currentColor = '#ff0000';
+        const gridSize = 0.00045; // Размер пикселя
+        const pixels = {};
+
+        // Карта Салехарда (Google)
+        const map = L.map('map').setView([66.53, 66.61], 15);
+        L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}').addTo(map);
+
+        function drawPixel(id, color, owner) {
+            if (pixels[id]) map.removeLayer(pixels[id]);
+            const [lat, lng] = id.split('_').map(Number);
+            pixels[id] = L.rectangle([[lat, lng], [lat + gridSize, lng + gridSize]], {
+                color: color, fillOpacity: 0.5, weight: 1
+            }).bindPopup(`Владелец: ${owner}`).addTo(map);
+        }
+
+        socket.on('init_map', (data) => {
+            for (let id in data) drawPixel(id, data[id].color, data[id].owner);
+        });
+
+        socket.on('pixel_updated', (data) => {
+            drawPixel(data.id, data.color, data.username);
+        });
+
+        map.locate({watch: true, enableHighAccuracy: true});
+        map.on('locationfound', (e) => {
+            const lat = Math.floor(e.latlng.lat / gridSize) * gridSize;
+            const lng = Math.floor(e.latlng.lng / gridSize) * gridSize;
+            const id = `${lat.toFixed(5)}_${lng.toFixed(5)}`;
+            const nick = document.getElementById('nick').value || 'Аноним';
+
+            socket.emit('paint_pixel', { id, color: currentColor, username: nick });
+        });
+    </script>
+</body>
+</html>
