@@ -5,35 +5,20 @@ const io = require('socket.io')(http, { cors: { origin: "*" } });
 const path = require('path');
 
 let mapState = {}; 
-const users = {}; 
 
 app.use(express.static(path.join(__dirname, 'public')));
 
 io.on('connection', (socket) => {
-    // Отправляем количество людей онлайн
+    // Рассылаем онлайн всем
     io.emit('online_stats', io.engine.clientsCount);
 
-    // Авторизация
-    socket.on('auth_request', (data) => {
-        const { user, pass } = data;
-        if (!users[user]) {
-            users[user] = pass;
-            socket.emit('auth_success', { username: user });
-        } else {
-            if (users[user] === pass) {
-                socket.emit('auth_success', { username: user });
-            } else {
-                socket.emit('auth_fail', "Неверный пароль!");
-            }
-        }
-    });
-
-    // Инициализация карты для вошедшего
+    // Отправляем карту новому игроку
     socket.emit('init_map', mapState);
 
-    // Рисование
+    // Логика покраски
     socket.on('paint_pixel', (data) => {
-        mapState[data.id] = { color: data.color, owner: data.username };
+        // data.uid - это зашифрованный ID игрока
+        mapState[data.id] = { color: data.color, owner: data.uid };
         io.emit('pixel_updated', data);
     });
 
@@ -44,5 +29,5 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 http.listen(PORT, () => {
-    console.log('Server is running on port ' + PORT);
+    console.log('GeoMetka Server LIVE on port ' + PORT);
 });
