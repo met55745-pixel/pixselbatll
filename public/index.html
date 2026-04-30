@@ -1,121 +1,55 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GeoMetka | Pixel Battle</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <style>
-        :root {
-            --bg: #2f2f2f;
-            --panel: rgba(45, 45, 45, 0.9);
-            --text: #e0e0e0;
-            --accent: #5dade2;
-            --border: rgba(255,255,255,0.05);
-        }
+// ... (весь CSS и начало скрипта оставляем из прошлой версии) ...
 
-        body, html { margin: 0; padding: 0; height: 100%; background: var(--bg); font-family: sans-serif; overflow: hidden; }
-        #map { height: 100vh; width: 100vw; z-index: 1; background: var(--bg); }
+        let playerMarkers = {}; // Тут храним иконки других игроков
+        let myCurrentPos = null;
 
-        /* Панели */
-        .ui-card {
-            position: absolute; z-index: 1000; background: var(--panel);
-            backdrop-filter: blur(10px); border-radius: 12px; border: 1px solid var(--border);
-            padding: 15px; color: var(--text); box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        }
-
-        .stats-box { top: 20px; left: 20px; width: 180px; }
-        .controls-box { bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 15px; }
-
-        .label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--accent); margin-bottom: 5px; }
-        .val { font-size: 16px; font-weight: bold; }
-
-        .color-btn { width: 32px; height: 32px; border-radius: 8px; cursor: pointer; border: 2px solid transparent; transition: 0.2s; }
-        .color-btn.active { border-color: white; transform: scale(1.1); }
-
-        #leaderboard { margin-top: 10px; font-size: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
-        .leader-row { display: flex; justify-content: space-between; margin-bottom: 4px; opacity: 0.8; }
-    </style>
-</head>
-<body>
-
-    <div class="ui-card stats-box">
-        <div class="label">В сети</div>
-        <div class="val" id="online-count">1</div>
-        <div id="leaderboard"></div>
-    </div>
-
-    <div id="map"></div>
-
-    <div class="ui-card controls-box">
-        <div class="color-btn active" onclick="pickColor('#ff4757', this)" style="background: #ff4757;"></div>
-        <div class="color-btn" onclick="pickColor('#2ed573', this)" style="background: #2ed573;"></div>
-        <div class="color-btn" onclick="pickColor('#1e90ff', this)" style="background: #1e90ff;"></div>
-        <div style="border-left: 1px solid var(--border); padding-left: 15px;">
-            <div class="label">Твой счет</div>
-            <div class="val" id="my-score">0</div>
-        </div>
-    </div>
-
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="/socket.io/socket.io.js"></script>
-    <script>
-        const socket = io();
-        const gridSize = 0.0004;
-        let currentColor = '#ff4757';
-        let pixels = {};
-        let fullMapData = {};
-
-        // 1. Генерируем уникальный ID игрока (шифровка без регистрации)
-        let myUID = localStorage.getItem('pixel_uid');
-        if (!myUID) {
-            myUID = 'ID-' + Math.random().toString(36).substr(2, 5).toUpperCase();
-            localStorage.setItem('pixel_uid', myUID);
-        }
-
-        // 2. Настройка карты
+        // 3. Удержание экрана и настройки карты
         const map = L.map('map', { zoomControl: false }).setView([66.53, 66.61], 15);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
 
-        // 3. Функции отрисовки
-        function drawPixel(id, color, owner) {
-            if (pixels[id]) map.removeLayer(pixels[id]);
-            const [lat, lng] = id.split('_').map(Number);
-            pixels[id] = L.rectangle([[lat, lng], [lat + gridSize, lng + gridSize]], {
-                color: color, fillColor: color, fillOpacity: 0.7, weight: 0
-            }).bindPopup(`Игрок: ${owner}`).addTo(map);
+        // Функция для создания "метки" игрока
+        function getPlayerIcon(color) {
+            return L.divIcon({
+                className: 'player-marker',
+                html: `<div style="background:${color}; width:12px; height:12px; border-radius:50%; border:2px solid white; box-shadow: 0 0 10px ${color}"></div>`,
+                iconSize: [12, 12]
+            });
         }
 
-        function updateUI() {
-            const stats = {};
-            Object.values(fullMapData).forEach(p => { stats[p.owner] = (stats[p.owner] || 0) + 1; });
-            
-            // Топ 3
-            const sorted = Object.entries(stats).sort((a,b) => b[1] - a[1]).slice(0, 3);
-            document.getElementById('leaderboard').innerHTML = sorted.map(([id, count]) => 
-                `<div class="leader-row"><span>${id}</span><b>${count}</b></div>`).join('');
-            
-            document.getElementById('my-score').innerText = stats[myUID] || 0;
-        }
+        // 4. ГЛАВНЫЙ ТАЙМЕР (Обновление раз в 1 сек)
+        setInterval(() => {
+            if (myCurrentPos) {
+                // Отправляем свои координаты серверу
+                socket.emit('update_position', {
+                    uid: myUID,
+                    lat: myCurrentPos.lat,
+                    lng: myCurrentPos.lng,
+                    color: currentColor
+                });
+            }
+        }, 1000);
 
-        // 4. Socket события
-        socket.on('init_map', (data) => {
-            fullMapData = data;
-            for (let id in data) drawPixel(id, data[id].color, data[id].owner);
-            updateUI();
+        // Слушаем позиции других игроков
+        socket.on('players_nearby', (serverPlayers) => {
+            for (let id in serverPlayers) {
+                if (id === myUID) continue; // Себя не рисуем как метку (или можно оставить)
+                
+                const p = serverPlayers[id];
+                if (playerMarkers[id]) {
+                    playerMarkers[id].setLatLng([p.lat, p.lng]); // Просто двигаем метку
+                } else {
+                    playerMarkers[id] = L.marker([p.lat, p.lng], { icon: getPlayerIcon(p.color) })
+                        .addTo(map)
+                        .bindTooltip(id, { permanent: false });
+                }
+            }
         });
 
-        socket.on('pixel_updated', (data) => {
-            fullMapData[data.id] = { color: data.color, owner: data.uid };
-            drawPixel(data.id, data.color, data.uid);
-            updateUI();
-        });
-
-        socket.on('online_stats', (count) => { document.getElementById('online-count').innerText = count; });
-
-        // 5. ГЕОЛОКАЦИЯ (GPS)
+        // 5. GPS (Логика покраски остается)
         map.locate({watch: true, enableHighAccuracy: true});
         map.on('locationfound', (e) => {
+            myCurrentPos = e.latlng; // Сохраняем для таймера
+            
             const lat = Math.floor(e.latlng.lat / gridSize) * gridSize;
             const lng = Math.floor(e.latlng.lng / gridSize) * gridSize;
             const id = `${lat.toFixed(5)}_${lng.toFixed(5)}`;
@@ -123,21 +57,9 @@
             if (!fullMapData[id] || fullMapData[id].owner !== myUID) {
                 socket.emit('paint_pixel', { id, color: currentColor, uid: myUID });
             }
+            
+            // Центрируем карту за собой, если надо
+            // map.panTo(e.latlng); 
         });
 
-        // 6. Клик (для теста)
-        map.on('click', (e) => {
-            const lat = Math.floor(e.latlng.lat / gridSize) * gridSize;
-            const lng = Math.floor(e.latlng.lng / gridSize) * gridSize;
-            const id = `${lat.toFixed(5)}_${lng.toFixed(5)}`;
-            socket.emit('paint_pixel', { id, color: currentColor, uid: myUID });
-        });
-
-        function pickColor(c, el) {
-            currentColor = c;
-            document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
-            el.classList.add('active');
-        }
-    </script>
-</body>
-</html>
+// ... (остальные функции socket.on('init_map') и т.д. без изменений) ...
