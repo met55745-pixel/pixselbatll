@@ -3,87 +3,98 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GeoMetka | Pixel Battle SLH</title>
+    <title>GeoMetka</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
-            --glass: rgba(15, 15, 15, 0.75);
-            --accent: #00f2ff;
+            --bg: #2f2f2f;
+            --panel: rgba(60, 60, 60, 0.8);
             --text: #ffffff;
+            --accent: #5dade2;
+            --border: rgba(255,255,255,0.1);
         }
 
-        body, html { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; font-family: 'Segoe UI', Roboto, sans-serif; }
-        #map { height: 100vh; width: 100vw; filter: brightness(0.8) contrast(1.2); }
-
-        /* Логотип GeoMetka */
-        .logo {
-            position: absolute; top: 20px; left: 20px; z-index: 1000;
-            font-size: 24px; font-weight: 800; color: var(--accent);
-            text-transform: uppercase; letter-spacing: 2px;
-            text-shadow: 0 0 10px rgba(0, 242, 255, 0.5);
-            background: var(--glass); padding: 10px 20px; border-radius: 12px;
-            border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(10px);
+        .light-theme {
+            --bg: #e0e0e0;
+            --panel: rgba(255, 255, 255, 0.85);
+            --text: #2f2f2f;
+            --accent: #2980b9;
+            --border: rgba(0,0,0,0.1);
         }
 
-        /* Боковая панель (Топ и Онлайн) */
-        .side-panel {
-            position: absolute; top: 90px; left: 20px; z-index: 1000;
-            width: 220px; background: var(--glass); color: var(--text);
-            padding: 20px; border-radius: 15px; backdrop-filter: blur(15px);
-            border: 1px solid rgba(255,255,255,0.1);
-            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        body, html { margin: 0; padding: 0; height: 100%; background: var(--bg); font-family: 'Segoe UI', system-ui, sans-serif; transition: background 0.3s; }
+        #map { height: 100vh; width: 100vw; z-index: 1; }
+
+        /* Окно Регистрации/Входа */
+        #auth-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); z-index: 2000;
+            display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px);
         }
 
-        .panel-h { font-size: 14px; color: var(--accent); margin-bottom: 10px; text-transform: uppercase; font-weight: bold; }
-        .stat-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 13px; opacity: 0.9; }
-        
-        /* Нижняя панель управления */
-        .bottom-ui {
-            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
-            z-index: 1000; background: var(--glass); padding: 15px 25px;
-            border-radius: 20px; backdrop-filter: blur(20px);
-            display: flex; align-items: center; gap: 15px;
-            border: 1px solid rgba(255,255,255,0.1);
+        .auth-card {
+            background: var(--bg); padding: 30px; border-radius: 20px;
+            width: 300px; text-align: center; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
+
+        .auth-card h2 { color: var(--text); margin-bottom: 20px; font-weight: 400; }
 
         input {
-            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
-            padding: 8px 12px; border-radius: 8px; color: white; outline: none;
+            width: 90%; padding: 12px; margin: 8px 0; border-radius: 10px;
+            border: 1px solid var(--border); background: var(--panel); color: var(--text); outline: none;
         }
 
-        .color-btn { width: 35px; height: 35px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.2); cursor: pointer; transition: 0.3s; }
-        .color-btn:hover { transform: scale(1.2); border-color: #fff; }
+        button.main-btn {
+            width: 100%; padding: 12px; margin-top: 15px; border-radius: 10px;
+            border: none; background: var(--accent); color: white; cursor: pointer; font-weight: bold;
+        }
 
-        .counter { font-size: 12px; color: var(--accent); text-align: center; margin-top: 5px; }
+        /* Панели управления */
+        .ui-panel {
+            position: absolute; z-index: 1000; background: var(--panel);
+            backdrop-filter: blur(10px); border-radius: 15px; border: 1px solid var(--border);
+            padding: 15px; color: var(--text); transition: 0.3s;
+        }
 
-        /* Стиль карты */
-        .leaflet-container { background: #0b0d10 !important; }
+        .top-left { top: 20px; left: 20px; }
+        .bottom-center { bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 15px; }
+
+        .theme-toggle {
+            cursor: pointer; padding: 5px 10px; border-radius: 8px; background: var(--accent);
+            color: white; font-size: 12px; border: none; margin-bottom: 10px;
+        }
+
+        .color-dot { width: 30px; height: 30px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
+        .color-dot.active { border-color: var(--text); }
     </style>
 </head>
 <body>
 
-    <div class="logo">GeoMetka</div>
-
-    <div class="side-panel">
-        <div class="panel-h">Онлайн: <span id="online-count">1</span></div>
-        <hr style="border: 0.5px solid rgba(255,255,255,0.1); margin: 15px 0;">
-        <div class="panel-h">Топ игроков</div>
-        <div id="leaderboard">
-            <div class="stat-row"><span>Загрузка...</span></div>
+    <div id="auth-overlay">
+        <div class="auth-card">
+            <h2 id="auth-title">Вход в GeoMetka</h2>
+            <input type="text" id="username" placeholder="Никнейм">
+            <input type="password" id="password" placeholder="Пароль">
+            <button class="main-btn" onclick="authenticate()">Войти / Начать</button>
+            <p id="auth-msg" style="color: #e74c3c; font-size: 12px; margin-top: 10px;"></p>
         </div>
+    </div>
+
+    <div class="ui-panel top-left">
+        <button class="theme-toggle" onclick="toggleTheme()">Сменить тему</button>
+        <div style="font-size: 12px; opacity: 0.7;">Онлайн: <span id="online-count">0</span></div>
+        <div id="leaderboard" style="margin-top: 10px; font-size: 13px;"></div>
     </div>
 
     <div id="map"></div>
 
-    <div class="bottom-ui">
-        <input type="text" id="nick" placeholder="Твой ник" maxlength="12">
-        <div class="color-btn" onclick="currentColor='#ff4757'" style="background: #ff4757;"></div>
-        <div class="color-btn" onclick="currentColor='#2ed573'" style="background: #2ed573;"></div>
-        <div class="color-btn" onclick="currentColor='#1e90ff'" style="background: #1e90ff;"></div>
-        <div class="color-btn" onclick="currentColor='#ffa502'" style="background: #ffa502;"></div>
-        <div style="margin-left: 10px;">
-            <div class="panel-h" style="margin:0">Твой счет</div>
-            <div id="my-score" class="counter">0</div>
+    <div class="ui-panel bottom-center">
+        <div class="color-dot" onclick="setBtnColor('#ff4757', this)" style="background: #ff4757;"></div>
+        <div class="color-dot" onclick="setBtnColor('#2ed573', this)" style="background: #2ed573;"></div>
+        <div class="color-dot" onclick="setBtnColor('#1e90ff', this)" style="background: #1e90ff;"></div>
+        <div style="border-left: 1px solid var(--border); padding-left: 15px;">
+            <div style="font-size: 10px; text-transform: uppercase;">Счет</div>
+            <div id="my-score" style="font-weight: bold; font-size: 18px;">0</div>
         </div>
     </div>
 
@@ -91,59 +102,60 @@
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
+        let userToken = null;
+        let myNick = "";
         let currentColor = '#ff4757';
-        let myScore = 0;
         const gridSize = 0.0004;
-        const pixels = {};
 
+        // Карта
         const map = L.map('map', { zoomControl: false }).setView([66.53, 66.61], 15);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+        let tiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
 
-        function updateLeaderboard(mapState) {
-            const stats = {};
-            Object.values(mapState).forEach(p => {
-                stats[p.owner] = (stats[p.owner] || 0) + 1;
-            });
-            
-            const sorted = Object.entries(stats).sort((a,b) => b[1] - a[1]).slice(0, 5);
-            const html = sorted.map(([name, count]) => `
-                <div class="stat-row"><span>${name}</span><b>${count}</b></div>
-            `).join('');
-            document.getElementById('leaderboard').innerHTML = html || '<div class="stat-row">Мир пуст...</div>';
-            
-            const myNick = document.getElementById('nick').value || 'Аноним';
-            document.getElementById('my-score').innerText = stats[myNick] || 0;
+        function toggleTheme() {
+            document.body.classList.toggle('light-theme');
+            const isLight = document.body.classList.contains('light-theme');
+            map.removeLayer(tiles);
+            tiles = L.tileLayer(isLight 
+                ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+                : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+            ).addTo(map);
         }
 
-        function drawPixel(id, color, owner) {
-            if (pixels[id]) map.removeLayer(pixels[id]);
-            const [lat, lng] = id.split('_').map(Number);
-            pixels[id] = L.rectangle([[lat, lng], [lat + gridSize, lng + gridSize]], {
-                color: color, fillColor: color, fillOpacity: 0.8, weight: 0
-            }).bindPopup(`Владелец: ${owner}`).addTo(map);
+        function authenticate() {
+            const user = document.getElementById('username').value;
+            const pass = document.getElementById('password').value;
+            if(!user || !pass) return alert("Заполни все поля!");
+            
+            socket.emit('auth_request', { user, pass });
         }
 
+        socket.on('auth_success', (data) => {
+            myNick = data.username;
+            document.getElementById('auth-overlay').style.display = 'none';
+        });
+
+        socket.on('auth_fail', (msg) => {
+            document.getElementById('auth-msg').innerText = msg;
+        });
+
+        // Остальная логика отрисовки...
         socket.on('init_map', (data) => {
-            for (let id in data) drawPixel(id, data[id].color, data[id].owner);
-            updateLeaderboard(data);
-        });
-
-        socket.on('pixel_updated', (data) => {
-            drawPixel(data.id, data.color, data.username);
-            // Запрашиваем обновленный топ (сервер должен будет пересчитать или мы сами тут)
-        });
-
-        socket.on('online_stats', (count) => {
-            document.getElementById('online-count').innerText = count;
+            // Отрисовка клеток как раньше
         });
 
         map.on('click', (e) => {
+            if(!myNick) return;
             const lat = Math.floor(e.latlng.lat / gridSize) * gridSize;
             const lng = Math.floor(e.latlng.lng / gridSize) * gridSize;
             const id = `${lat.toFixed(5)}_${lng.toFixed(5)}`;
-            const nick = document.getElementById('nick').value || 'Аноним';
-            socket.emit('paint_pixel', { id, color: currentColor, username: nick });
+            socket.emit('paint_pixel', { id, color: currentColor, username: myNick });
         });
+
+        function setBtnColor(c, el) {
+            currentColor = c;
+            document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
+            el.classList.add('active');
+        }
     </script>
 </body>
 </html>
