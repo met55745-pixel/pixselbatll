@@ -5,7 +5,8 @@ const io = require('socket.io')(http, { cors: { origin: "*" } });
 const path = require('path');
 
 let mapState = {}; 
-let players = {}; // Храним позиции всех игроков
+let players = {}; 
+let socketToUid = {};
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -13,8 +14,9 @@ io.on('connection', (socket) => {
     io.emit('online_stats', io.engine.clientsCount);
     socket.emit('init_map', mapState);
 
-    // Принимаем позицию игрока и рассылаем всем
     socket.on('update_position', (data) => {
+        if (!data.uid) return;
+        socketToUid[socket.id] = data.uid;
         players[data.uid] = { lat: data.lat, lng: data.lng, color: data.color };
         io.emit('players_nearby', players);
     });
@@ -25,11 +27,12 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
-        // Удаляем игрока из списка при выходе
-        // (Для простоты оставим, пока не обновится онлайн)
+        const uid = socketToUid[socket.id];
+        if (uid) { delete players[uid]; delete socketToUid[socket.id]; }
+        io.emit('players_nearby', players);
         io.emit('online_stats', io.engine.clientsCount);
     });
 });
 
 const PORT = process.env.PORT || 3000;
-http.listen(PORT, () => { console.log('Server running on ' + PORT); });
+http.listen(PORT, () => { console.log(`🚀 RELEASE READY ON PORT ${PORT}`); });
