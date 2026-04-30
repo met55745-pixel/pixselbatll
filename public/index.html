@@ -3,81 +3,59 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>GeoMetka | Pro Tracker</title>
+    <title>GeoMetka</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
             --dark: #121212;
             --glass: rgba(30, 30, 30, 0.85);
             --border: rgba(255, 255, 255, 0.15);
-            --accent: #00d2ff;
         }
 
-        body, html { 
-            margin: 0; padding: 0; height: 100%; 
-            background: var(--dark); 
-            font-family: -apple-system, system-ui, sans-serif;
-            color: white; overflow: hidden;
-        }
+        body, html { margin: 0; padding: 0; height: 100%; background: var(--dark); overflow: hidden; }
+        #map { height: 100vh; width: 100vw; background: #000; }
 
-        #map { height: 100vh; width: 100vw; z-index: 1; background: #000; }
-
-        /* UI Элементы */
+        /* Стеклянные карточки UI */
         .glass-card {
             background: var(--glass);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
             border: 1px solid var(--border);
-            border-radius: 18px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border-radius: 15px;
         }
 
         .header-ui {
-            position: absolute; top: 20px; left: 15px; right: 15px;
+            position: absolute; top: 15px; left: 15px; right: 15px;
             z-index: 1000; display: flex; gap: 10px;
         }
 
-        .stat-box { flex: 1; padding: 12px; text-align: center; }
-        .stat-label { font-size: 10px; text-transform: uppercase; color: var(--accent); font-weight: 700; opacity: 0.9; }
-        .stat-val { font-size: 18px; font-weight: 900; margin-top: 2px; }
+        .stat-box { flex: 1; padding: 10px; text-align: center; color: white; font-family: sans-serif; }
+        .stat-label { font-size: 9px; text-transform: uppercase; opacity: 0.6; margin-bottom: 2px; }
+        .stat-val { font-size: 16px; font-weight: 800; }
 
         .bottom-ui {
-            position: absolute; bottom: 35px; left: 15px; right: 15px;
-            z-index: 1000; display: flex; flex-direction: column; gap: 15px;
+            position: absolute; bottom: 25px; left: 15px; right: 15px;
+            z-index: 1000; display: flex; flex-direction: column; gap: 10px;
         }
 
-        .color-picker { display: flex; justify-content: space-around; padding: 18px; }
+        .color-picker { display: flex; justify-content: space-around; padding: 12px; }
         .color-node {
-            width: 45px; height: 45px; border-radius: 50%;
-            border: 3px solid transparent; transition: 0.2s;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+            width: 40px; height: 40px; border-radius: 50%;
+            border: 2px solid transparent; transition: 0.2s;
         }
-        .color-node.active { border-color: white; transform: scale(1.15); }
+        .color-node.active { border-color: white; transform: scale(1.1); }
 
-        /* Кнопка "Где я?" */
+        /* Твой новый курсор — Красная точка */
+        .red-dot {
+            width: 14px; height: 14px; background: #ff4757; 
+            border: 3px solid white; border-radius: 50%;
+            box-shadow: 0 0 10px rgba(255, 71, 87, 0.8);
+        }
+
         .locate-btn {
-            position: absolute; right: 15px; bottom: 130px;
-            width: 50px; height: 50px; border-radius: 15px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 24px; z-index: 1000; cursor: pointer;
-        }
-
-        /* Кастомный маркер */
-        .my-marker {
-            width: 20px; height: 20px; background: white; border-radius: 50%;
-            border: 4px solid var(--accent); box-shadow: 0 0 20px var(--accent);
-            animation: pulse 2s infinite;
-        }
-        @keyframes pulse {
-            0% { transform: scale(1); filter: brightness(1); }
-            50% { transform: scale(1.2); filter: brightness(1.3); }
-            100% { transform: scale(1); filter: brightness(1); }
-        }
-        
-        .accuracy-circle {
-            border: 2px solid var(--accent);
-            background: rgba(0, 210, 255, 0.15);
-            border-radius: 50%;
+            position: absolute; right: 15px; bottom: 110px;
+            width: 45px; height: 45px; display: flex; align-items: center; justify-content: center;
+            font-size: 20px; z-index: 1000; cursor: pointer;
         }
     </style>
 </head>
@@ -85,15 +63,11 @@
 
     <div class="header-ui">
         <div class="glass-card stat-box">
-            <div class="stat-label">Игроки</div>
+            <div class="stat-label">Онлайн</div>
             <div class="stat-val" id="online-count">0</div>
         </div>
         <div class="glass-card stat-box">
-            <div class="stat-label">Точность</div>
-            <div id="gps-accuracy" class="stat-val">--</div>
-        </div>
-        <div class="glass-card stat-box">
-            <div class="stat-label">Зоны</div>
+            <div class="stat-label">Твои зоны</div>
             <div class="stat-val" id="my-score">0</div>
         </div>
     </div>
@@ -108,7 +82,6 @@
             <div class="color-node" onclick="setCol('#2ed573', this)" style="background: #2ed573;"></div>
             <div class="color-node" onclick="setCol('#1e90ff', this)" style="background: #1e90ff;"></div>
             <div class="color-node" onclick="setCol('#ffa502', this)" style="background: #ffa502;"></div>
-            <div class="color-node" onclick="setCol('#a29bfe', this)" style="background: #a29bfe;"></div>
         </div>
     </div>
 
@@ -116,24 +89,17 @@
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        const gridSize = 0.0004;
-        let myUID = localStorage.getItem('p_uid') || 'P-' + Math.random().toString(36).substr(2, 4).toUpperCase();
+        const gridSize = 0.0003; // Чуть уменьшил размер клетки для кучности
+        let myUID = localStorage.getItem('p_uid') || 'U' + Math.floor(Math.random()*9999);
         localStorage.setItem('p_uid', myUID);
 
         let currentColor = '#ff4757';
         let pixels = {};
-        let otherPlayers = {};
         let myMarker = null;
-        let accuracyCircle = null;
-        let fullMapData = {};
         let lastPos = null;
+        let fullMapData = {};
 
-        const map = L.map('map', { 
-            zoomControl: false, 
-            attributionControl: false,
-            doubleClickZoom: false
-        }).setView([66.53, 66.61], 17);
-
+        const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([66.53, 66.61], 17);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
 
         function setCol(c, el) {
@@ -142,8 +108,14 @@
             el.classList.add('active');
         }
 
-        function recenter() {
-            if (lastPos) map.flyTo(lastPos, 18);
+        function recenter() { if (lastPos) map.flyTo(lastPos, 18); }
+
+        function drawRect(id, color) {
+            if (pixels[id]) map.removeLayer(pixels[id]);
+            const [lat, lng] = id.split('_').map(Number);
+            pixels[id] = L.rectangle([[lat, lng], [lat + gridSize, lng + gridSize]], {
+                color: color, fillColor: color, fillOpacity: 0.4, weight: 0, interactive: false
+            }).addTo(map);
         }
 
         socket.on('init_map', (data) => {
@@ -158,99 +130,44 @@
             updateScore();
         });
 
-        function drawRect(id, color) {
-            if (pixels[id]) map.removeLayer(pixels[id]);
-            const [lat, lng] = id.split('_').map(Number);
-            pixels[id] = L.rectangle([[lat, lng], [lat + gridSize, lng + gridSize]], {
-                color: color, fillColor: color, fillOpacity: 0.5, weight: 0
-            }).addTo(map);
-        }
-
         function updateScore() {
             let count = Object.values(fullMapData).filter(p => p.owner === myUID).length;
             document.getElementById('my-score').innerText = count;
         }
 
-        // ЖЕСТКАЯ GPS СИСТЕМА
-        map.locate({ 
-            watch: true, 
-            enableHighAccuracy: true, 
-            maximumAge: 0,
-            timeout: 10000 
-        });
+        // Слежение за позицией
+        map.locate({ watch: true, enableHighAccuracy: true, maximumAge: 0 });
 
         map.on('locationfound', (e) => {
             const { lat, lng } = e.latlng;
             lastPos = e.latlng;
-            
-            // Обновляем текст точности
-            const acc = Math.round(e.accuracy);
-            document.getElementById('gps-accuracy').innerText = acc + 'м';
-            document.getElementById('gps-accuracy').style.color = acc < 20 ? '#2ed573' : '#ffa502';
 
-            // Если точность совсем плохая (>50м), просто ждем нормальный сигнал
-            if (acc > 50) return;
-
-            // Двигаем маркер персонажа
+            // Обновляем маркер (Красная точка)
             if (!myMarker) {
                 myMarker = L.marker([lat, lng], {
-                    icon: L.divIcon({ className: 'my-marker', iconSize: [20, 20] }),
+                    icon: L.divIcon({ className: 'red-dot', iconSize: [14, 14] }),
                     zIndexOffset: 1000
                 }).addTo(map);
-                
-                accuracyCircle = L.circle([lat, lng], {
-                    radius: e.accuracy,
-                    className: 'accuracy-circle',
-                    weight: 1, interactive: false
-                }).addTo(map);
-                
                 map.setView([lat, lng], 18);
             } else {
                 myMarker.setLatLng([lat, lng]);
-                accuracyCircle.setLatLng([lat, lng]);
-                accuracyCircle.setRadius(e.accuracy);
             }
 
-            // Шлем координаты другим
+            // Отправляем на сервер
             socket.emit('update_position', { uid: myUID, lat, lng, color: currentColor });
 
-            // Красим сетку
+            // Логика закрашивания
             const gLat = Math.floor(lat / gridSize) * gridSize;
             const gLng = Math.floor(lng / gridSize) * gridSize;
-            const pId = `${gLat.toFixed(5)}_${gLng.toFixed(5)}`;
+            const pId = `${gLat.toFixed(6)}_${gLng.toFixed(6)}`;
             
-            // Красим только если клетка чужая или пустая
+            // Если клетка пустая или не наша — красим
             if (!fullMapData[pId] || fullMapData[pId].owner !== myUID) {
                 socket.emit('paint_pixel', { id: pId, color: currentColor, uid: myUID });
             }
         });
 
-        socket.on('players_nearby', (list) => {
-            for (let id in list) {
-                if (id === myUID) continue;
-                const p = list[id];
-                if (otherPlayers[id]) {
-                    otherPlayers[id].setLatLng([p.lat, p.lng]);
-                } else {
-                    otherPlayers[id] = L.marker([p.lat, p.lng], {
-                        icon: L.divIcon({ 
-                            className: 'other-marker', 
-                            html: `<div style="background:${p.color}; width:100%; height:100%; border-radius:50%;"></div>`,
-                            iconSize: [14, 14] 
-                        })
-                    }).addTo(map);
-                }
-            }
-            for (let id in otherPlayers) {
-                if (!list[id]) { map.removeLayer(otherPlayers[id]); delete otherPlayers[id]; }
-            }
-        });
-
         socket.on('online_stats', (count) => { document.getElementById('online-count').innerText = count; });
-
-        if ('wakeLock' in navigator) {
-            navigator.wakeLock.request('screen').catch(() => {});
-        }
     </script>
 </body>
 </html>
