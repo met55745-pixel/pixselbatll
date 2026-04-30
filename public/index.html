@@ -3,109 +3,185 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GeoMetka | Pixel Battle</title>
+    <title>GeoMetka | Ultimate Edition</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
+        /* ==========================================
+           СТИЛИ И ДИЗАЙН (ELEGANT GREY)
+           ========================================== */
         :root {
             --bg: #2f2f2f;
-            --panel: rgba(45, 45, 45, 0.9);
+            --panel: rgba(45, 45, 45, 0.85);
             --text: #e0e0e0;
             --accent: #5dade2;
-            --border: rgba(255,255,255,0.05);
+            --border: rgba(255,255,255,0.08);
+            --shadow: 0 8px 32px rgba(0,0,0,0.4);
         }
 
-        body, html { margin: 0; padding: 0; height: 100%; background: var(--bg); font-family: sans-serif; overflow: hidden; }
+        body, html { 
+            margin: 0; padding: 0; height: 100%; 
+            background: var(--bg); font-family: 'Segoe UI', system-ui, sans-serif; 
+            overflow: hidden; /* Запрет скролла страницы */
+        }
+        
         #map { height: 100vh; width: 100vw; z-index: 1; background: var(--bg); }
 
+        /* Общий стиль для всех UI панелей */
         .ui-card {
             position: absolute; z-index: 1000; background: var(--panel);
-            backdrop-filter: blur(10px); border-radius: 12px; border: 1px solid var(--border);
-            padding: 15px; color: var(--text); box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
+            border-radius: 16px; border: 1px solid var(--border);
+            padding: 18px; color: var(--text); box-shadow: var(--shadow);
         }
 
-        .stats-box { top: 20px; left: 20px; width: 180px; }
-        .controls-box { bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 15px; }
+        /* Левая верхняя статистика */
+        .stats-box { top: 20px; left: 20px; width: 200px; }
+        
+        /* Нижняя панель управления цветами */
+        .controls-box { 
+            bottom: 30px; left: 50%; transform: translateX(-50%); 
+            display: flex; align-items: center; gap: 15px; 
+        }
 
-        .label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--accent); margin-bottom: 5px; }
-        .val { font-size: 16px; font-weight: bold; }
+        .label { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--accent); margin-bottom: 6px; font-weight: 600; }
+        .val { font-size: 20px; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
 
-        .color-btn { width: 32px; height: 32px; border-radius: 8px; cursor: pointer; border: 2px solid transparent; transition: 0.2s; }
-        .color-btn.active { border-color: white; transform: scale(1.1); }
+        /* Кнопки выбора цвета */
+        .color-btn { 
+            width: 36px; height: 36px; border-radius: 10px; cursor: pointer; 
+            border: 2px solid rgba(255,255,255,0.1); transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        .color-btn:hover { transform: translateY(-3px); }
+        .color-btn.active { border-color: #ffffff; transform: scale(1.15) translateY(-2px); box-shadow: 0 0 15px currentColor; }
 
-        #leaderboard { margin-top: 10px; font-size: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
-        .leader-row { display: flex; justify-content: space-between; margin-bottom: 4px; opacity: 0.8; }
+        /* Таблица лидеров */
+        #leaderboard { margin-top: 15px; font-size: 13px; border-top: 1px solid var(--border); padding-top: 12px; }
+        .leader-row { display: flex; justify-content: space-between; margin-bottom: 6px; opacity: 0.85; }
+        .leader-row b { color: var(--accent); }
+
+        /* Стили для маркеров игроков на карте */
+        .player-marker-container { display: flex; justify-content: center; align-items: center; }
+        .player-marker-core {
+            width: 14px; height: 14px; border-radius: 50%; 
+            border: 2px solid #ffffff; transition: background 0.3s;
+        }
     </style>
 </head>
 <body>
 
+    <!-- Интерфейс -->
     <div class="ui-card stats-box">
-        <div class="label">В сети</div>
-        <div class="val" id="online-count">1</div>
-        <div id="leaderboard"></div>
+        <div class="label">Городской Онлайн</div>
+        <div class="val" id="online-count">Ожидание...</div>
+        <div id="leaderboard">
+            <div style="opacity: 0.5; font-size: 11px;">Загрузка данных...</div>
+        </div>
     </div>
 
     <div id="map"></div>
 
     <div class="ui-card controls-box">
-        <div class="color-btn active" onclick="pickColor('#ff4757', this)" style="background: #ff4757;"></div>
-        <div class="color-btn" onclick="pickColor('#2ed573', this)" style="background: #2ed573;"></div>
-        <div class="color-btn" onclick="pickColor('#1e90ff', this)" style="background: #1e90ff;"></div>
-        <div style="border-left: 1px solid var(--border); padding-left: 15px;">
-            <div class="label">Твой счет</div>
+        <div class="color-btn active" onclick="pickColor('#ff4757', this)" style="background: #ff4757; color: #ff4757;"></div>
+        <div class="color-btn" onclick="pickColor('#2ed573', this)" style="background: #2ed573; color: #2ed573;"></div>
+        <div class="color-btn" onclick="pickColor('#1e90ff', this)" style="background: #1e90ff; color: #1e90ff;"></div>
+        <div class="color-btn" onclick="pickColor('#ffa502', this)" style="background: #ffa502; color: #ffa502;"></div>
+        <div style="border-left: 1px solid var(--border); padding-left: 15px; margin-left: 5px;">
+            <div class="label">Захвачено</div>
             <div class="val" id="my-score">0</div>
         </div>
     </div>
 
+    <!-- Скрипты -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script>
+        // ==========================================
+        // ИНИЦИАЛИЗАЦИЯ И НАСТРОЙКИ
+        // ==========================================
         const socket = io();
-        const gridSize = 0.0004;
+        const gridSize = 0.0004; // Размер клетки (около 40-50 метров)
         let currentColor = '#ff4757';
-        let pixels = {};
-        let fullMapData = {};
+        
+        let pixels = {};          // Слой отрисованных прямоугольников (клеток)
+        let fullMapData = {};     // Полные данные карты
+        let playerMarkers = {};   // Хранилище объектов-маркеров других игроков
+        let myCurrentPos = null;  // Текущие координаты пользователя
 
-        // 1. Уникальный ID
+        // 1. Авто-генерация и сохранение уникального ID профиля
         let myUID = localStorage.getItem('pixel_uid');
         if (!myUID) {
-            myUID = 'ID-' + Math.random().toString(36).substr(2, 5).toUpperCase();
+            myUID = 'ID-' + Math.random().toString(36).substr(2, 6).toUpperCase();
             localStorage.setItem('pixel_uid', myUID);
+            console.log("Создан новый профиль:", myUID);
         }
 
-        // 2. Настройка карты
-        const map = L.map('map', { zoomControl: false }).setView([66.53, 66.61], 15);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+        // 2. Создание Карты Leaflet
+        const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([66.53, 66.61], 15);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            maxZoom: 19
+        }).addTo(map);
 
-        // 3. Удержание экрана включенным (Wake Lock)
-        let wakeLock = null;
-        async function requestWakeLock() {
-            try {
-                if ('wakeLock' in navigator) {
-                    wakeLock = await navigator.wakeLock.request('screen');
-                }
-            } catch (err) { console.log(err.name, err.message); }
+        // ==========================================
+        // ФУНКЦИИ ОТРИСОВКИ И UI
+        // ==========================================
+        
+        // Создание визуального маркера (точки) для игроков
+        function createPlayerIcon(color) {
+            return L.divIcon({
+                className: 'player-marker-container',
+                html: `<div class="player-marker-core" style="background-color: ${color}; box-shadow: 0 0 15px ${color};"></div>`,
+                iconSize: [20, 20],
+                iconAnchor: [10, 10]
+            });
         }
-        requestWakeLock();
 
-        // 4. Отрисовка
+        // Отрисовка закрашенной клетки
         function drawPixel(id, color, owner) {
-            if (pixels[id]) map.removeLayer(pixels[id]);
+            if (pixels[id]) map.removeLayer(pixels[id]); // Если клетка была, стираем старую
+            
             const [lat, lng] = id.split('_').map(Number);
-            pixels[id] = L.rectangle([[lat, lng], [lat + gridSize, lng + gridSize]], {
-                color: color, fillColor: color, fillOpacity: 0.7, weight: 0
-            }).bindPopup(`Игрок: ${owner}`).addTo(map);
+            const bounds = [[lat, lng], [lat + gridSize, lng + gridSize]];
+            
+            pixels[id] = L.rectangle(bounds, {
+                color: color, 
+                fillColor: color, 
+                fillOpacity: 0.75, 
+                weight: 1, 
+                opacity: 0.3
+            }).bindPopup(`<b>Территория</b><br>Владелец: ${owner}`).addTo(map);
         }
 
+        // Подсчет статистики и обновление Топ-Листа
         function updateUI() {
             const stats = {};
-            Object.values(fullMapData).forEach(p => { stats[p.owner] = (stats[p.owner] || 0) + 1; });
-            const sorted = Object.entries(stats).sort((a,b) => b[1] - a[1]).slice(0, 3);
-            document.getElementById('leaderboard').innerHTML = sorted.map(([id, count]) => 
-                `<div class="leader-row"><span>${id}</span><b>${count}</b></div>`).join('');
+            Object.values(fullMapData).forEach(p => { 
+                stats[p.owner] = (stats[p.owner] || 0) + 1; 
+            });
+            
+            const sorted = Object.entries(stats).sort((a,b) => b[1] - a[1]).slice(0, 4);
+            document.getElementById('leaderboard').innerHTML = sorted.map(([id, count]) => {
+                const isMe = id === myUID ? 'style="color: white; font-weight: bold;"' : '';
+                return `<div class="leader-row" ${isMe}><span>${id}</span><b>${count}</b></div>`;
+            }).join('');
+            
             document.getElementById('my-score').innerText = stats[myUID] || 0;
         }
 
-        // 5. Socket события
+        // Выбор цвета из нижней панели
+        function pickColor(c, el) {
+            currentColor = c;
+            document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+            el.classList.add('active');
+            
+            // Сразу форсируем отправку новых данных, чтобы маркер сменил цвет у других
+            if (myCurrentPos) sendMyPosition();
+        }
+
+        // ==========================================
+        // РАБОТА С СЕТЬЮ (SOCKET.IO)
+        // ==========================================
+        
         socket.on('init_map', (data) => {
             fullMapData = data;
             for (let id in data) drawPixel(id, data[id].color, data[id].owner);
@@ -118,36 +194,119 @@
             updateUI();
         });
 
-        socket.on('online_stats', (count) => { document.getElementById('online-count').innerText = count; });
+        socket.on('online_stats', (count) => { 
+            document.getElementById('online-count').innerText = count; 
+        });
 
-        // 6. GPS
-        map.locate({watch: true, enableHighAccuracy: true});
+        // Синхронизация радара (метки других игроков)
+        socket.on('players_nearby', (serverPlayers) => {
+            // 1. Добавляем или обновляем существующих
+            for (let id in serverPlayers) {
+                if (id === myUID) continue; // Себя не рисуем маркером, себя мы центрируем картой
+                
+                const p = serverPlayers[id];
+                if (playerMarkers[id]) {
+                    // Плавное перемещение существующего маркера
+                    playerMarkers[id].setLatLng([p.lat, p.lng]);
+                    playerMarkers[id].setIcon(createPlayerIcon(p.color)); // Обновляем цвет, если он сменил
+                } else {
+                    // Создаем новый маркер
+                    playerMarkers[id] = L.marker([p.lat, p.lng], { 
+                        icon: createPlayerIcon(p.color) 
+                    }).addTo(map).bindTooltip(id, { direction: 'top', offset: [0, -10] });
+                }
+            }
+            
+            // 2. Очищаем отключившихся игроков с карты
+            for (let existingId in playerMarkers) {
+                if (!serverPlayers[existingId]) {
+                    map.removeLayer(playerMarkers[existingId]);
+                    delete playerMarkers[existingId];
+                }
+            }
+        });
+
+        // Функция отправки позиции серверу
+        function sendMyPosition() {
+            if (!myCurrentPos) return;
+            socket.emit('update_position', {
+                uid: myUID,
+                lat: myCurrentPos.lat,
+                lng: myCurrentPos.lng,
+                color: currentColor
+            });
+        }
+
+        // ==========================================
+        // ДВИЖОК ИГРЫ: ГЕОЛОКАЦИЯ И ТАЙМЕРЫ
+        // ==========================================
+
+        // Главный таймер (Пульс) - отправляет наши координаты раз в 1 секунду
+        setInterval(sendMyPosition, 1000);
+
+        // Умная геолокация: отслеживаем перемещение непрерывно
+        map.locate({watch: true, enableHighAccuracy: true, maximumAge: 2000});
+        
         map.on('locationfound', (e) => {
+            myCurrentPos = e.latlng;
+            
+            // Расчет ID клетки, в которой мы стоим
             const lat = Math.floor(e.latlng.lat / gridSize) * gridSize;
             const lng = Math.floor(e.latlng.lng / gridSize) * gridSize;
             const id = `${lat.toFixed(5)}_${lng.toFixed(5)}`;
+            
+            // Если клетка не наша, захватываем её (отправляем запрос)
             if (!fullMapData[id] || fullMapData[id].owner !== myUID) {
                 socket.emit('paint_pixel', { id, color: currentColor, uid: myUID });
             }
         });
 
+        // Обработчик ошибок GPS
+        map.on('locationerror', (e) => {
+            console.warn("GPS Ошибка (Возможно мы в помещении):", e.message);
+        });
+
+        // Резервный метод: покраска кликом для тестов из дома
         map.on('click', (e) => {
             const lat = Math.floor(e.latlng.lat / gridSize) * gridSize;
             const lng = Math.floor(e.latlng.lng / gridSize) * gridSize;
             const id = `${lat.toFixed(5)}_${lng.toFixed(5)}`;
             socket.emit('paint_pixel', { id, color: currentColor, uid: myUID });
+            
+            // Для тестов дома, имитируем перемещение по клику
+            myCurrentPos = e.latlng;
+            sendMyPosition(); 
         });
 
-        function pickColor(c, el) {
-            currentColor = c;
-            document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
-            el.classList.add('active');
+        // ==========================================
+        // АНТИ-СОН (WAKE LOCK API ДЛЯ APK)
+        // ==========================================
+        let wakeLock = null;
+        async function keepScreenAlive() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    console.log('Экран заблокирован от затухания. Игра активна.');
+                    
+                    wakeLock.addEventListener('release', () => {
+                        console.log('Защита экрана снята.');
+                    });
+                }
+            } catch (err) {
+                console.error(`Ошибка WakeLock: ${err.name}, ${err.message}`);
+            }
         }
-
-        // 7. Простейшее авто-обновление: перезагрузка при потере связи
-        socket.on('disconnect', () => {
-            setTimeout(() => { location.reload(); }, 5000);
+        
+        // Включаем при первом клике на экран (браузеры требуют действие пользователя)
+        document.addEventListener('click', keepScreenAlive, { once: true });
+        
+        // Восстанавливаем защиту экрана, если переключались между окнами
+        document.addEventListener('visibilitychange', async () => {
+            if (wakeLock !== null && document.visibilityState === 'visible') {
+                await keepScreenAlive();
+            }
         });
+
     </script>
 </body>
 </html>
