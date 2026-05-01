@@ -18,14 +18,14 @@
             background: var(--dark); 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             color: white; overflow: hidden;
-            user-select: none; /* Защита от случайного выделения в APK */
+            user-select: none;
         }
 
         #map { height: 100vh; width: 100vw; z-index: 1; background: #000; }
 
-        /* ПЛАВНОСТЬ МАРКЕРОВ */
+        /* Ускорил анимацию, чтобы курсор меньше "отставал" от реальности */
         .leaflet-marker-icon {
-            transition: transform 0.5s linear !important;
+            transition: transform 0.2s linear !important;
         }
 
         .header-ui {
@@ -49,9 +49,36 @@
         .stat-label { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: var(--accent); opacity: 0.9; font-weight: 700;}
         .stat-val { font-size: 18px; font-weight: 800; margin-top: 2px; }
 
+        /* Твой красный курсор */
+        .red-dot {
+            width: 18px; height: 18px; 
+            background: #ff4757; 
+            border: 3px solid white; 
+            border-radius: 50%;
+            box-shadow: 0 0 15px rgba(255, 71, 87, 0.8);
+            animation: pulse-red 2s infinite ease-in-out;
+        }
+
+        /* Улучшенные маркеры других игроков */
+        .other-marker { 
+            width: 16px; height: 16px; 
+            border-radius: 50%; 
+            border: 2px solid white; 
+            box-shadow: 0 0 10px rgba(255,255,255,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        @keyframes pulse-red {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
         .bottom-ui {
             position: absolute; bottom: 30px; left: 15px; right: 15px;
-            z-index: 1000; display: flex; flex-direction: column; gap: 15px;
+            z-index: 1000;
         }
 
         .color-picker {
@@ -63,27 +90,9 @@
             width: 40px; height: 40px; border-radius: 50%;
             border: 3px solid transparent; transition: 0.2s;
             box-shadow: 0 4px 15px rgba(0,0,0,0.4);
-            position: relative; cursor: pointer;
         }
 
         .color-node.active { border-color: white; transform: scale(1.15); }
-        
-        /* Тот самый крутой красный курсор */
-        .red-dot {
-            width: 16px; height: 16px; 
-            background: #ff4757; 
-            border: 3px solid white; 
-            border-radius: 50%;
-            box-shadow: 0 0 15px rgba(255, 71, 87, 0.8);
-            animation: pulse-red 2s infinite ease-in-out;
-        }
-        @keyframes pulse-red {
-            0% { transform: scale(1); box-shadow: 0 0 10px rgba(255, 71, 87, 0.6); }
-            50% { transform: scale(1.15); box-shadow: 0 0 25px rgba(255, 71, 87, 1); }
-            100% { transform: scale(1); box-shadow: 0 0 10px rgba(255, 71, 87, 0.6); }
-        }
-
-        .other-marker { width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
     </style>
 </head>
 <body>
@@ -107,18 +116,14 @@
             <div class="color-node" onclick="setCol('#2ed573', this)" style="background: #2ed573;"></div>
             <div class="color-node" onclick="setCol('#1e90ff', this)" style="background: #1e90ff;"></div>
             <div class="color-node" onclick="setCol('#ffa502', this)" style="background: #ffa502;"></div>
-            <div class="color-node" onclick="setCol('#a29bfe', this)" style="background: #a29bfe;"></div>
         </div>
     </div>
 
-    <!-- Библиотека карт Leaflet -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <!-- Подключаем Turf.js для вычисления общих границ "государств" -->
     <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        
         let myUID = localStorage.getItem('p_uid') || 'P-' + Math.random().toString(36).substr(2, 4).toUpperCase();
         localStorage.setItem('p_uid', myUID);
 
@@ -126,80 +131,64 @@
         let otherPlayers = {};
         let myMarker = null;
         let fullMapData = {};
+        let isFollowing = true; // Флаг для авто-следования камеры
 
-        // Базовые настройки карты
         const map = L.map('map', { 
-            zoomControl: false, attributionControl: false, doubleClickZoom: false 
-        }).setView([66.53, 66.61], 17);
+            zoomControl: false, attributionControl: false 
+        }).setView([0, 0], 17);
 
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
-
-        // Слой, где будут рисоваться наши "государства"
         let countryLayers = L.layerGroup().addTo(map);
 
-        // Математика сетки: 50 метров (в градусах)
-        const latStep = 0.00045; // ~50м в высоту
-        let lngStep = latStep;   // Заглушка, обновится по первому фиксу GPS
+        const latStep = 0.00045; 
+        let lngStep = latStep;
 
         function setCol(c, el) {
             currentColor = c;
             document.querySelectorAll('.color-node').forEach(b => b.classList.remove('active'));
             el.classList.add('active');
+            if(myMarker) {
+                // Меняем цвет своего пульсирующего свечения
+                document.querySelector('.red-dot').style.background = c;
+                document.querySelector('.red-dot').style.boxShadow = `0 0 15px ${c}`;
+            }
         }
 
-        // Функция объединения квадратов в "государства"
+        // Если пользователь сам двигает карту — отключаем авто-следование
+        map.on('dragstart', () => { isFollowing = false; });
+        
+        // Кнопка возврата к себе (можно добавить UI) или просто двойной тап
+        map.on('dblclick', () => { isFollowing = true; });
+
         function redrawCountries() {
             countryLayers.clearLayers();
             let colorGroups = {};
-            
             for(let id in fullMapData) {
                 let col = fullMapData[id].color;
                 if(!colorGroups[col]) colorGroups[col] = [];
-                
-                let parts = id.split('_');
-                let lat = parseFloat(parts[0]);
-                let lng = parseFloat(parts[1]);
-                
-                // Создаем полигон-квадрат
+                let [lat, lng] = id.split('_').map(parseFloat);
                 let poly = turf.polygon([[
                     [lng, lat],
                     [lng + lngStep, lat],
                     [lng + lngStep, lat + latStep],
                     [lng, lat + latStep],
                     [lng, lat]
-                ]], { color: col });
-                
+                ]]);
                 colorGroups[col].push(poly);
             }
 
             for(let col in colorGroups) {
-                let fc = turf.featureCollection(colorGroups[col]);
-                // Turf растворяет внутренние границы (dissolve), оставляя только внешний контур!
                 try {
+                    let fc = turf.featureCollection(colorGroups[col]);
                     let dissolved = turf.dissolve(fc);
-                    
                     L.geoJSON(dissolved, {
-                        style: {
-                            color: col,        // Цвет обводки
-                            weight: 3,         // Жирный край
-                            opacity: 1,        // Яркий контур
-                            fillColor: col,
-                            fillOpacity: 0.35  // Легкая заливка внутри
-                        },
-                        interactive: false // Чтобы сквозь них работал клик
+                        style: { color: col, weight: 2, opacity: 0.8, fillColor: col, fillOpacity: 0.3 }
                     }).addTo(countryLayers);
-                } catch (e) {
-                    console.error("Ошибка отрисовки зоны", e);
-                }
+                } catch(e) {}
             }
         }
 
-        socket.on('init_map', (data) => {
-            fullMapData = data;
-            redrawCountries();
-            updateScore();
-        });
-
+        socket.on('init_map', (data) => { fullMapData = data; redrawCountries(); updateScore(); });
         socket.on('pixel_updated', (data) => {
             fullMapData[data.id] = { color: data.color, owner: data.uid };
             redrawCountries();
@@ -211,36 +200,30 @@
             document.getElementById('my-score').innerText = count;
         }
 
-        // GPS СИСТЕМА
         map.locate({ watch: true, enableHighAccuracy: true, maximumAge: 1000 });
 
         map.on('locationfound', (e) => {
-            const lat = e.latlng.lat;
-            const lng = e.latlng.lng;
-
-            // Расчет шага долготы (компенсирует кривизну Земли, делает квадрат квадратом!)
+            const { lat, lng } = e.latlng;
             lngStep = latStep / Math.cos(lat * Math.PI / 180);
 
             if (!myMarker) {
                 myMarker = L.marker([lat, lng], {
-                    // Подключаем наш обновленный класс red-dot
-                    icon: L.divIcon({ className: 'red-dot', iconSize: [16, 16] })
+                    icon: L.divIcon({ className: 'red-dot', iconSize: [18, 18] })
                 }).addTo(map);
                 map.setView([lat, lng], 17);
             } else {
-                myMarker.setLatLng([lat, lng]); // Двигается плавно благодаря CSS
+                myMarker.setLatLng([lat, lng]);
+                if (isFollowing) map.panTo([lat, lng]); // Камера теперь следует за тобой!
             }
 
             socket.emit('update_position', { uid: myUID, lat, lng, color: currentColor });
 
-            // Привязка к сетке
             const gLat = (Math.floor(lat / latStep) * latStep).toFixed(6);
             const gLng = (Math.floor(lng / lngStep) * lngStep).toFixed(6);
             const pId = `${gLat}_${gLng}`;
             
             if (!fullMapData[pId] || fullMapData[pId].owner !== myUID) {
                 socket.emit('paint_pixel', { id: pId, color: currentColor, uid: myUID });
-                // Локальная пред-отрисовка (чтобы не ждать ответа сервера)
                 fullMapData[pId] = { color: currentColor, owner: myUID };
                 redrawCountries();
                 updateScore();
@@ -254,6 +237,7 @@
                 if (otherPlayers[id]) {
                     otherPlayers[id].setLatLng([p.lat, p.lng]);
                 } else {
+                    // Создаем метку другого игрока с его цветом
                     otherPlayers[id] = L.marker([p.lat, p.lng], {
                         icon: L.divIcon({ 
                             className: 'other-marker', 
@@ -262,17 +246,12 @@
                     }).addTo(map);
                 }
             }
-            // Удаление отключившихся
             for (let id in otherPlayers) {
                 if (!list[id]) { map.removeLayer(otherPlayers[id]); delete otherPlayers[id]; }
             }
         });
 
         socket.on('online_stats', (count) => { document.getElementById('online-count').innerText = count; });
-
-        if ('wakeLock' in navigator) {
-            navigator.wakeLock.request('screen').catch(() => {});
-        }
     </script>
 </body>
 </html>
