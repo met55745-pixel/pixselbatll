@@ -3,209 +3,398 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>GeoMetka | Absolute Precision</title>
+    <title>GeoMetka | Absolute Master Copy</title>
+    
+    <!-- Подключаем внешние ресурсы -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
     <style>
+        /* 
+           CSS СЕКЦИЯ: ПОЛНАЯ КАСТОМИЗАЦИЯ ИНТЕРФЕЙСА 
+        */
         :root {
-            --accent: #00f2ff;
-            --glass: rgba(10, 10, 10, 0.9);
+            --neon-blue: #00f2ff;
+            --neon-red: #ff4757;
+            --neon-green: #2ed573;
+            --dark-bg: #050505;
+            --glass-bg: rgba(15, 15, 15, 0.9);
+            --border-glow: rgba(0, 242, 255, 0.3);
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
         }
 
         body, html { 
-            margin: 0; padding: 0; height: 100%; 
-            background: #000; overflow: hidden;
-            font-family: 'Inter', sans-serif;
+            margin: 0; padding: 0; height: 100%; width: 100%;
+            background: var(--dark-bg); 
+            color: #ffffff;
+            font-family: 'JetBrains Mono', monospace;
+            overflow: hidden;
         }
 
-        #map { height: 100vh; width: 100vw; }
-
-        /* UI */
-        .hud {
-            position: absolute; top: 20px; left: 20px; right: 20px;
-            z-index: 1000; display: flex; justify-content: space-between;
-            pointer-events: none;
+        /* Карта */
+        #map { 
+            height: 100%; width: 100%; 
+            background: #000; 
+            z-index: 1;
         }
 
-        .status-box {
-            background: var(--glass);
-            border: 1px solid rgba(0, 242, 255, 0.3);
-            padding: 10px 15px; border-radius: 8px;
-            backdrop-filter: blur(10px); pointer-events: auto;
+        /* Overlay элементов интерфейса */
+        .game-ui {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 1000; pointer-events: none;
+            display: flex; flex-direction: column;
+            justify-content: space-between;
+            padding: env(safe-area-inset-top) 20px env(safe-area-inset-bottom) 20px;
         }
 
-        .label { font-size: 9px; color: var(--accent); font-weight: 800; text-transform: uppercase; }
-        .val { font-size: 18px; font-weight: 900; color: #fff; }
+        /* Верхняя панель (ХУД) */
+        .hud-top {
+            display: flex; justify-content: space-between; margin-top: 15px;
+            pointer-events: auto;
+        }
 
-        /* МАРКЕР И ЛУЧ */
-        .player-container { position: relative; width: 0; height: 0; }
-        
-        /* Тот самый "Луч" */
-        .view-cone {
+        .hud-card {
+            background: var(--glass-bg);
+            border: 1px solid var(--border-glow);
+            border-bottom: 3px solid var(--neon-blue);
+            backdrop-filter: blur(10px);
+            padding: 10px 15px;
+            border-radius: 4px;
+            min-width: 120px;
+        }
+
+        .hud-label {
+            font-size: 8px; color: var(--neon-blue);
+            text-transform: uppercase; letter-spacing: 1.5px;
+            margin-bottom: 4px;
+        }
+
+        .hud-value {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 20px; font-weight: 900;
+        }
+
+        /* Нижняя панель управления */
+        .hud-bottom {
+            margin-bottom: 25px; pointer-events: auto;
+            display: flex; flex-direction: column; align-items: center; gap: 15px;
+        }
+
+        .color-palette {
+            display: flex; gap: 20px;
+            background: var(--glass-bg);
+            padding: 15px 25px; border-radius: 50px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .color-swatch {
+            width: 40px; height: 40px; border-radius: 50%;
+            border: 2px solid transparent; cursor: pointer;
+            transition: 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .color-swatch.active {
+            transform: scale(1.3); border-color: white;
+            box-shadow: 0 0 15px currentColor;
+        }
+
+        /* Персонализированный Маркер Игрока */
+        .player-anchor {
+            position: relative; width: 0; height: 0;
+        }
+
+        .player-vision {
             position: absolute; bottom: 0; left: 50%;
-            width: 120px; height: 160px;
-            background: conic-gradient(from -30deg, rgba(0, 242, 255, 0.4) 0deg, rgba(0, 242, 255, 0) 60deg);
+            width: 150px; height: 220px;
+            background: conic-gradient(
+                from -30deg, 
+                rgba(0, 242, 255, 0.5) 0deg, 
+                rgba(0, 242, 255, 0.1) 30deg, 
+                rgba(0, 242, 255, 0) 60deg
+            );
             transform-origin: bottom center;
-            transform: translate(-50%, 0) rotate(0deg);
-            filter: blur(4px); pointer-events: none;
+            filter: blur(8px); pointer-events: none;
             z-index: -1;
         }
 
         .player-core {
-            width: 16px; height: 16px; 
-            background: #fff; border: 3px solid var(--accent);
-            border-radius: 50%; box-shadow: 0 0 20px var(--accent);
+            width: 22px; height: 22px;
+            background: #fff; border: 4px solid var(--neon-blue);
+            border-radius: 50%; box-shadow: 0 0 20px var(--neon-blue);
+            z-index: 10;
         }
 
-        .controls {
-            position: absolute; bottom: 30px; width: 100%;
-            display: flex; justify-content: center; gap: 15px; z-index: 1000;
+        /* Анимации захвата */
+        @keyframes capture-pulse {
+            0% { transform: scale(0.1); opacity: 1; }
+            100% { transform: scale(5); opacity: 0; }
         }
 
-        .c-node {
-            width: 40px; height: 40px; border-radius: 50%;
-            border: 2px solid rgba(255,255,255,0.2); transition: 0.3s;
+        .capture-effect {
+            width: 50px; height: 50px; border: 2px solid #fff;
+            border-radius: 50%; position: absolute;
+            animation: capture-pulse 0.6s ease-out forwards;
         }
-        .c-node.active { transform: scale(1.2); border-color: #fff; box-shadow: 0 0 15px currentColor; }
     </style>
 </head>
 <body>
 
-    <div class="hud">
-        <div class="status-box">
-            <div class="label">Accuracy</div>
-            <div id="acc-val" class="val">0m</div>
-        </div>
-        <div class="status-box">
-            <div class="label">Points</div>
-            <div id="score" class="val">0</div>
-        </div>
-    </div>
-
     <div id="map"></div>
 
-    <div class="controls">
-        <div class="c-node active" style="background: #ff4757;" data-color="#ff4757"></div>
-        <div class="c-node" style="background: #2ed573;" data-color="#2ed573"></div>
-        <div class="c-node" style="background: #1e90ff;" data-color="#1e90ff"></div>
+    <div class="game-ui">
+        <!-- ВЕРХ -->
+        <div class="hud-top">
+            <div class="hud-card">
+                <div class="hud-label">Captured Areas</div>
+                <div id="ui-score" class="hud-value">0</div>
+            </div>
+            <div class="hud-card" id="gps-status">
+                <div class="hud-label">GPS Accuracy</div>
+                <div id="ui-accuracy" class="hud-value">--</div>
+            </div>
+        </div>
+
+        <!-- ЦЕНТР (Уведомления) -->
+        <div id="event-log" style="pointer-events: none;"></div>
+
+        <!-- НИЗ -->
+        <div class="hud-bottom">
+            <div class="color-palette">
+                <div class="color-swatch active" style="background: var(--neon-red);" data-hex="#ff4757"></div>
+                <div class="color-swatch" style="background: var(--neon-green);" data-hex="#2ed573"></div>
+                <div class="color-swatch" style="background: #1e90ff;" data-hex="#1e90ff"></div>
+                <div class="color-swatch" style="background: #ffa502;" data-hex="#ffa502"></div>
+            </div>
+        </div>
     </div>
 
+    <!-- СКРИПТЫ -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
 
     <script>
-        const socket = io();
-        let myColor = '#ff4757';
-        let mapData = {};
-        let myUID = 'G-' + Math.random().toString(36).substr(2, 5).toUpperCase();
+        /**
+         * MASTER CONFIGURATION
+         */
+        const CONFIG = {
+            gridSize: 0.00045, // Размер сектора (примерно 50 метров)
+            mapZoom: 19,
+            minAccuracy: 25,   // Минимальная точность GPS для захвата
+            smoothing: 0.15    // Коэффициент плавности следования камеры
+        };
 
-        const map = L.map('map', { 
-            zoomControl: false, 
+        /**
+         * CORE STATE
+         */
+        let state = {
+            uid: localStorage.getItem('player_uid') || 'P-' + Math.random().toString(36).substr(2, 5).toUpperCase(),
+            activeColor: '#ff4757',
+            mapData: {}, // Хранилище всех секторов
+            lastPos: null,
+            isLocked: false
+        };
+        localStorage.setItem('player_uid', state.uid);
+
+        /**
+         * INITIALIZE MAP
+         */
+        const map = L.map('map', {
+            zoomControl: false,
             attributionControl: false,
-            // Фишка для плавности:
             zoomSnap: 0.1,
-            easeLinearity: 0.1
-        }).setView([0,0], 19);
+            easeLinearity: CONFIG.smoothing
+        }).setView([0,0], 2);
 
+        // Используем CartoDB Dark Matter для стиля "Old Money / Night City"
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
-        const paintLayer = L.layerGroup().addTo(map);
 
-        let playerMarker, coneEl;
+        const sectorGroup = L.layerGroup().addTo(map);
+        let playerMarker = null;
+        let visionConeEl = null;
 
-        // --- УЛЬТРА GPS ЛОГИКА ---
+        /**
+         * SOCKET.IO ИНТЕГРАЦИЯ
+         */
+        const socket = io();
+
+        socket.on('sync_world', (data) => {
+            state.mapData = data;
+            renderWorld();
+        });
+
+        socket.on('sector_claimed', (data) => {
+            state.mapData[data.id] = { color: data.color, uid: data.uid };
+            renderWorld();
+        });
+
+        /**
+         * ГЕО-МАТЕМАТИКА: СЕТКА И ЗАХВАТ
+         */
+        function handlePosition(lat, lng, accuracy) {
+            // Обновляем UI точности
+            const accEl = document.getElementById('ui-accuracy');
+            accEl.innerText = Math.round(accuracy) + 'm';
+            document.getElementById('gps-status').style.borderBottomColor = accuracy < CONFIG.minAccuracy ? '#2ed573' : '#ffa502';
+
+            // Привязка к сетке (Snap to Grid)
+            const latStep = CONFIG.gridSize;
+            const lngStep = CONFIG.gridSize / Math.cos(lat * Math.PI / 180);
+
+            const gridY = (Math.floor(lat / latStep) * latStep).toFixed(6);
+            const gridX = (Math.floor(lng / lngStep) * lngStep).toFixed(6);
+            const sectorId = `${gridY}_${gridX}`;
+
+            // Проверка: нужно ли захватывать?
+            if (!state.mapData[sectorId] || state.mapData[sectorId].uid !== state.uid) {
+                if (accuracy <= CONFIG.minAccuracy) {
+                    captureSector(sectorId, gridY, gridX);
+                }
+            }
+
+            // Плавное обновление маркера
+            updatePlayerMarker(lat, lng);
+        }
+
+        function captureSector(id, lat, lng) {
+            state.mapData[id] = { color: state.activeColor, uid: state.uid };
+            socket.emit('claim', { id, color: state.activeColor, uid: state.uid });
+            
+            // Визуальный фидбек
+            showFlashEffect();
+            renderWorld();
+        }
+
+        /**
+         * ОТРИСОВКА МИРА (ОПТИМИЗИРОВАННО ЧЕРЕЗ TURF)
+         */
+        function renderWorld() {
+            sectorGroup.clearLayers();
+            const colorBuckets = {};
+
+            // Группируем по цветам для Dissolve
+            for (let id in state.mapData) {
+                const item = state.mapData[id];
+                if (!colorBuckets[item.color]) colorBuckets[item.color] = [];
+                
+                const [lat, lng] = id.split('_').map(Number);
+                const latStep = CONFIG.gridSize;
+                const lngStep = CONFIG.gridSize / Math.cos(lat * Math.PI / 180);
+
+                const polygon = turf.polygon([[
+                    [lng, lat],
+                    [lng + lngStep, lat],
+                    [lng + lngStep, lat + latStep],
+                    [lng, lat + latStep],
+                    [lng, lat]
+                ]]);
+                colorBuckets[item.color].push(polygon);
+            }
+
+            // Рисуем каждую цветовую зону как единый объект
+            for (let color in colorBuckets) {
+                try {
+                    const fc = turf.featureCollection(colorBuckets[color]);
+                    const dissolved = turf.dissolve(fc);
+
+                    L.geoJSON(dissolved, {
+                        style: {
+                            fillColor: color,
+                            fillOpacity: 0.4,
+                            color: color,
+                            weight: 2,
+                            opacity: 0.8
+                        }
+                    }).addTo(sectorGroup);
+                } catch (e) {
+                    console.warn("Turf Error during dissolve:", e);
+                }
+            }
+
+            // Обновляем очки
+            const myScore = Object.values(state.mapData).filter(s => s.uid === state.uid).length;
+            document.getElementById('ui-score').innerText = myScore;
+        }
+
+        /**
+         * ВИЗУАЛИЗАЦИЯ ИГРОКА
+         */
+        function updatePlayerMarker(lat, lng) {
+            if (!playerMarker) {
+                const container = L.DomUtil.create('div', 'player-anchor');
+                container.innerHTML = `<div class="player-vision"></div><div class="player-core"></div>`;
+                
+                playerMarker = L.marker([lat, lng], {
+                    icon: L.divIcon({ html: container, className: '', iconSize: [0,0] }),
+                    zIndexOffset: 1000
+                }).addTo(map);
+
+                visionConeEl = container.querySelector('.player-vision');
+                map.setView([lat, lng], CONFIG.mapZoom);
+            } else {
+                playerMarker.setLatLng([lat, lng]);
+                map.panTo([lat, lng]);
+            }
+        }
+
+        /**
+         * КОМПАС И ОРИЕНТАЦИЯ (ЛУЧ)
+         */
+        window.addEventListener('deviceorientation', (e) => {
+            if (e.alpha !== null && visionConeEl) {
+                // Корректный расчет угла для мобилок
+                const heading = e.webkitCompassHeading || (360 - e.alpha);
+                visionConeEl.style.transform = `translate(-50%, 0) rotate(${heading}deg)`;
+            }
+        }, true);
+
+        /**
+         * GPS ENGINE (ULTRA PRECISION)
+         */
         const geoOptions = {
-            enableHighAccuracy: true, // Включаем железный GPS
-            maximumAge: 0,            // НИКАКОГО КЭША, только свежие данные
-            timeout: 10000            // Ждем спутник до победного
+            enableHighAccuracy: true,
+            maximumAge: 0,
+            timeout: 15000
         };
 
         map.locate({ watch: true, ...geoOptions });
 
         map.on('locationfound', (e) => {
-            const { lat, lng, accuracy } = e.latlng;
-            document.getElementById('acc-val').innerText = Math.round(accuracy) + 'm';
-
-            if (!playerMarker) {
-                const container = L.DomUtil.create('div', 'player-container');
-                container.innerHTML = `<div class="view-cone"></div><div class="player-core"></div>`;
-                
-                playerMarker = L.marker([lat, lng], {
-                    icon: L.divIcon({ html: container, className: '', iconSize: [0, 0] }),
-                    zIndexOffset: 1000
-                }).addTo(map);
-
-                coneEl = container.querySelector('.view-cone');
-                map.setView([lat, lng], 19);
-            } else {
-                // Привязка "Точь-в-точь"
-                playerMarker.setLatLng([lat, lng]);
-                // Центрируем камеру за игроком
-                map.panTo([lat, lng], { animate: true, duration: 0.5 });
-            }
-
-            // Механика захвата (сетка 50м)
-            processCapture(lat, lng);
+            handlePosition(e.latlng.lat, e.latlng.lng, e.accuracy);
         });
 
-        // Поворот "Луча" через компас
-        window.addEventListener('deviceorientation', (e) => {
-            if (e.alpha !== null && coneEl) {
-                const heading = 360 - e.alpha;
-                coneEl.style.transform = `translate(-50%, 0) rotate(${heading}deg)`;
-            }
-        }, true);
-
-        // --- ЛОГИКА СЕТКИ ---
-        const step = 0.00045; 
-
-        function processCapture(lat, lng) {
-            const lngStep = step / Math.cos(lat * Math.PI / 180);
-            const sLat = (Math.floor(lat / step) * step).toFixed(6);
-            const sLng = (Math.floor(lng / lngStep) * lngStep).toFixed(6);
-            const id = `${sLat}_${sLng}`;
-
-            if (!mapData[id] || mapData[id].uid !== myUID) {
-                mapData[id] = { color: myColor, uid: myUID };
-                socket.emit('claim', { id, color: myColor, uid: myUID });
-                renderMap();
-            }
-        }
-
-        function renderMap() {
-            paintLayer.clearLayers();
-            const colorGroups = {};
-
-            for (let id in mapData) {
-                const c = mapData[id];
-                if (!colorGroups[c.color]) colorGroups[c.color] = [];
-                
-                const [lt, lg] = id.split('_').map(Number);
-                const lStep = step / Math.cos(lt * Math.PI / 180);
-
-                colorGroups[c.color].push(turf.polygon([[
-                    [lg, lt], [lg + lStep, lt], [lg + lStep, lt + step], [lg, lt + step], [lg, lt]
-                ]]));
-            }
-
-            for (let col in colorGroups) {
-                const dissolved = turf.dissolve(turf.featureCollection(colorGroups[col]));
-                L.geoJSON(dissolved, {
-                    style: { color: col, weight: 2, fillColor: col, fillOpacity: 0.5 }
-                }).addTo(paintLayer);
-            }
-            document.getElementById('score').innerText = Object.values(mapData).filter(x => x.uid === myUID).length;
-        }
-
-        // Выбор цвета
-        document.querySelectorAll('.c-node').forEach(n => {
-            n.onclick = () => {
-                document.querySelectorAll('.c-node').forEach(b => b.classList.remove('active'));
-                n.classList.add('active');
-                myColor = n.dataset.color;
-            }
+        map.on('locationerror', (err) => {
+            console.error("GPS Error:", err.message);
         });
 
-        socket.on('update', (data) => { mapData = data; renderMap(); });
+        /**
+         * INTERFACE INTERACTIONS
+         */
+        document.querySelectorAll('.color-swatch').forEach(swatch => {
+            swatch.onclick = () => {
+                document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+                swatch.classList.add('active');
+                state.activeColor = swatch.dataset.hex;
+            };
+        });
+
+        function showFlashEffect() {
+            const flash = document.createElement('div');
+            flash.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                background: white; opacity: 0.15; z-index: 2000; pointer-events: none;
+            `;
+            document.body.appendChild(flash);
+            setTimeout(() => flash.remove(), 100);
+        }
+
+        // Авто-ресайз окна
+        window.onresize = () => map.invalidateSize();
+
     </script>
 </body>
 </html>
