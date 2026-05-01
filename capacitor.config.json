@@ -2,9 +2,13 @@
   "appId": "com.geometka.pro",
   "appName": "GeoMetka",
   "webDir": "www",
+  "bundledWebRuntime": false,
   "server": {
     "androidScheme": "https",
     "cleartext": true,
-    "allowNavigation": ["*"]
+    "allowNavigation": [
+      "pixselbatll.onrender.com",
+      "*.cartodb.com"
+    ]
   }
 }
