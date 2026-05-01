@@ -1,0 +1,30 @@
+name: Build APK
+on: [push] # Сборка будет запускаться каждый раз, когда ты меняешь код
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Install Dependencies
+        run: |
+          npm install
+          npm run build
+
+      - name: Build Android Project
+        run: |
+          npx cap add android
+          npx cap sync
+          cd android && ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: GeoMetka-Release
+          path: android/app/build/outputs/apk/debug/app-debug.apk
