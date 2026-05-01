@@ -1,21 +1,22 @@
 name: Build APK
-on: [push] # Сборка будет запускаться каждый раз, когда ты меняешь код
+on: [push]
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
 
       - name: Install Dependencies
         run: |
           npm install
-          npm run build
+          mkdir -p www
+          cp public/index.html www/
 
       - name: Build Android Project
         run: |
@@ -24,7 +25,7 @@ jobs:
           cd android && ./gradlew assembleDebug
 
       - name: Upload APK
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: GeoMetka-Release
           path: android/app/build/outputs/apk/debug/app-debug.apk
