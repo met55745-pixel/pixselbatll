@@ -3,100 +3,90 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>GeoMetka | Mobile Battle</title>
+    <title>GeoMetka | Absolute Precision</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
-            --dark: #0a0a0a;
-            --glass: rgba(20, 20, 20, 0.9);
-            --accent: #00d2ff;
+            --accent: #00f2ff;
+            --glass: rgba(10, 10, 10, 0.9);
         }
 
         body, html { 
             margin: 0; padding: 0; height: 100%; 
-            background: var(--dark); 
-            font-family: -apple-system, sans-serif;
-            color: white; overflow: hidden;
+            background: #000; overflow: hidden;
+            font-family: 'Inter', sans-serif;
         }
 
-        #map { height: 100vh; width: 100vw; background: #000; }
+        #map { height: 100vh; width: 100vw; }
 
         /* UI */
-        .header-ui {
-            position: absolute; top: 15px; left: 15px; right: 15px;
-            z-index: 1000; display: flex; gap: 10px;
+        .hud {
+            position: absolute; top: 20px; left: 20px; right: 20px;
+            z-index: 1000; display: flex; justify-content: space-between;
+            pointer-events: none;
         }
 
-        .glass-card {
+        .status-box {
             background: var(--glass);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 12px;
-            padding: 8px 12px;
-            flex: 1;
-            text-align: center;
+            border: 1px solid rgba(0, 242, 255, 0.3);
+            padding: 10px 15px; border-radius: 8px;
+            backdrop-filter: blur(10px); pointer-events: auto;
         }
 
-        .stat-label { font-size: 10px; color: var(--accent); font-weight: 800; text-transform: uppercase; }
-        .stat-val { font-size: 18px; font-weight: 900; }
+        .label { font-size: 9px; color: var(--accent); font-weight: 800; text-transform: uppercase; }
+        .val { font-size: 18px; font-weight: 900; color: #fff; }
 
-        .bottom-ui {
-            position: absolute; bottom: 30px; left: 0; right: 0;
-            z-index: 1000; display: flex; justify-content: center;
+        /* МАРКЕР И ЛУЧ */
+        .player-container { position: relative; width: 0; height: 0; }
+        
+        /* Тот самый "Луч" */
+        .view-cone {
+            position: absolute; bottom: 0; left: 50%;
+            width: 120px; height: 160px;
+            background: conic-gradient(from -30deg, rgba(0, 242, 255, 0.4) 0deg, rgba(0, 242, 255, 0) 60deg);
+            transform-origin: bottom center;
+            transform: translate(-50%, 0) rotate(0deg);
+            filter: blur(4px); pointer-events: none;
+            z-index: -1;
         }
 
-        .color-picker {
-            display: flex; gap: 15px; padding: 12px 20px;
-            background: var(--glass); border-radius: 30px;
-            border: 1px solid rgba(255,255,255,0.1);
+        .player-core {
+            width: 16px; height: 16px; 
+            background: #fff; border: 3px solid var(--accent);
+            border-radius: 50%; box-shadow: 0 0 20px var(--accent);
         }
 
-        .color-node {
-            width: 35px; height: 35px; border-radius: 50%;
-            border: 2px solid transparent; transition: 0.2s;
+        .controls {
+            position: absolute; bottom: 30px; width: 100%;
+            display: flex; justify-content: center; gap: 15px; z-index: 1000;
         }
 
-        .color-node.active { border-color: white; transform: scale(1.2); }
-
-        /* МАРКЕР */
-        .red-dot {
-            width: 18px; height: 18px; 
-            background: #ff4757; 
-            border: 3px solid white; 
-            border-radius: 50%;
-            box-shadow: 0 0 20px rgba(255, 71, 87, 0.8);
-            animation: pulse 1.5s infinite;
+        .c-node {
+            width: 40px; height: 40px; border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.2); transition: 0.3s;
         }
-
-        @keyframes pulse {
-            0% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.2); opacity: 0.8; }
-            100% { transform: scale(1); opacity: 1; }
-        }
+        .c-node.active { transform: scale(1.2); border-color: #fff; box-shadow: 0 0 15px currentColor; }
     </style>
 </head>
 <body>
 
-    <div class="header-ui">
-        <div class="glass-card">
-            <div class="stat-label">Online</div>
-            <div class="stat-val" id="online-count">1</div>
+    <div class="hud">
+        <div class="status-box">
+            <div class="label">Accuracy</div>
+            <div id="acc-val" class="val">0m</div>
         </div>
-        <div class="glass-card">
-            <div class="stat-label">Score</div>
-            <div class="stat-val" id="my-score">0</div>
+        <div class="status-box">
+            <div class="label">Points</div>
+            <div id="score" class="val">0</div>
         </div>
     </div>
 
     <div id="map"></div>
 
-    <div class="bottom-ui">
-        <div class="color-picker">
-            <div class="color-node active" onclick="setCol('#ff4757', this)" style="background: #ff4757;"></div>
-            <div class="color-node" onclick="setCol('#2ed573', this)" style="background: #2ed573;"></div>
-            <div class="color-node" onclick="setCol('#1e90ff', this)" style="background: #1e90ff;"></div>
-            <div class="color-node" onclick="setCol('#ffa502', this)" style="background: #ffa502;"></div>
-        </div>
+    <div class="controls">
+        <div class="c-node active" style="background: #ff4757;" data-color="#ff4757"></div>
+        <div class="c-node" style="background: #2ed573;" data-color="#2ed573"></div>
+        <div class="c-node" style="background: #1e90ff;" data-color="#1e90ff"></div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -105,112 +95,117 @@
 
     <script>
         const socket = io();
-        let myUID = localStorage.getItem('p_uid') || 'P-' + Math.random().toString(36).substr(2, 4).toUpperCase();
-        localStorage.setItem('p_uid', myUID);
+        let myColor = '#ff4757';
+        let mapData = {};
+        let myUID = 'G-' + Math.random().toString(36).substr(2, 5).toUpperCase();
 
-        let currentColor = '#ff4757';
-        let fullMapData = {};
-        let myMarker = null;
+        const map = L.map('map', { 
+            zoomControl: false, 
+            attributionControl: false,
+            // Фишка для плавности:
+            zoomSnap: 0.1,
+            easeLinearity: 0.1
+        }).setView([0,0], 19);
 
-        const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([0,0], 17);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+        const paintLayer = L.layerGroup().addTo(map);
 
-        const countryLayers = L.layerGroup().addTo(map);
+        let playerMarker, coneEl;
 
-        // Константа сетки (50 метров)
-        const latStep = 0.00045; 
+        // --- УЛЬТРА GPS ЛОГИКА ---
+        const geoOptions = {
+            enableHighAccuracy: true, // Включаем железный GPS
+            maximumAge: 0,            // НИКАКОГО КЭША, только свежие данные
+            timeout: 10000            // Ждем спутник до победного
+        };
 
-        function setCol(c, el) {
-            currentColor = c;
-            document.querySelectorAll('.color-node').forEach(b => b.classList.remove('active'));
-            el.classList.add('active');
-        }
-
-        // Отрисовка зон
-        function redrawCountries() {
-            countryLayers.clearLayers();
-            const colorGroups = {};
-
-            // Группируем квадраты по цветам
-            for (let id in fullMapData) {
-                const col = fullMapData[id].color;
-                if (!colorGroups[col]) colorGroups[col] = [];
-
-                const [lat, lng] = id.split('_').map(Number);
-                const lStep = latStep / Math.cos(lat * Math.PI / 180);
-
-                // Создаем полигон для каждого «пикселя»
-                const poly = turf.polygon([[
-                    [lng, lat],
-                    [lng + lStep, lat],
-                    [lng + lStep, lat + latStep],
-                    [lng, lat + latStep],
-                    [lng, lat]
-                ]]);
-                colorGroups[col].push(poly);
-            }
-
-            // Рисуем каждую цветовую группу
-            for (let col in colorGroups) {
-                try {
-                    const collection = turf.featureCollection(colorGroups[col]);
-                    const dissolved = turf.dissolve(collection);
-
-                    L.geoJSON(dissolved, {
-                        style: {
-                            color: col,
-                            weight: 2,
-                            fillColor: col,
-                            fillOpacity: 0.4
-                        }
-                    }).addTo(countryLayers);
-                } catch (e) {
-                    console.error("Ошибка Turf:", e);
-                }
-            }
-        }
-
-        // GPS логика
-        map.locate({ watch: true, enableHighAccuracy: true, maximumAge: 1000 });
+        map.locate({ watch: true, ...geoOptions });
 
         map.on('locationfound', (e) => {
-            const { lat, lng } = e.latlng;
+            const { lat, lng, accuracy } = e.latlng;
+            document.getElementById('acc-val').innerText = Math.round(accuracy) + 'm';
 
-            if (!myMarker) {
-                myMarker = L.marker([lat, lng], {
-                    icon: L.divIcon({ className: 'red-dot', iconSize: [18, 18] })
+            if (!playerMarker) {
+                const container = L.DomUtil.create('div', 'player-container');
+                container.innerHTML = `<div class="view-cone"></div><div class="player-core"></div>`;
+                
+                playerMarker = L.marker([lat, lng], {
+                    icon: L.divIcon({ html: container, className: '', iconSize: [0, 0] }),
+                    zIndexOffset: 1000
                 }).addTo(map);
-                map.setView([lat, lng], 17);
+
+                coneEl = container.querySelector('.view-cone');
+                map.setView([lat, lng], 19);
             } else {
-                myMarker.setLatLng([lat, lng]);
+                // Привязка "Точь-в-точь"
+                playerMarker.setLatLng([lat, lng]);
+                // Центрируем камеру за игроком
+                map.panTo([lat, lng], { animate: true, duration: 0.5 });
             }
 
-            // Сетка
-            const lStep = latStep / Math.cos(lat * Math.PI / 180);
-            const gLat = (Math.floor(lat / latStep) * latStep).toFixed(6);
-            const gLng = (Math.floor(lng / lStep) * lStep).toFixed(6);
-            const pId = `${gLat}_${gLng}`;
-
-            // Закрашиваем, если зона пустая или не наша
-            if (!fullMapData[pId] || fullMapData[pId].owner !== myUID) {
-                fullMapData[pId] = { color: currentColor, owner: myUID };
-                socket.emit('paint_pixel', { id: pId, color: currentColor, uid: myUID });
-                redrawCountries();
-                updateScore();
-            }
-
-            socket.emit('update_position', { uid: myUID, lat, lng, color: currentColor });
+            // Механика захвата (сетка 50м)
+            processCapture(lat, lng);
         });
 
-        function updateScore() {
-            const count = Object.values(fullMapData).filter(p => p.owner === myUID).length;
-            document.getElementById('my-score').innerText = count;
+        // Поворот "Луча" через компас
+        window.addEventListener('deviceorientation', (e) => {
+            if (e.alpha !== null && coneEl) {
+                const heading = 360 - e.alpha;
+                coneEl.style.transform = `translate(-50%, 0) rotate(${heading}deg)`;
+            }
+        }, true);
+
+        // --- ЛОГИКА СЕТКИ ---
+        const step = 0.00045; 
+
+        function processCapture(lat, lng) {
+            const lngStep = step / Math.cos(lat * Math.PI / 180);
+            const sLat = (Math.floor(lat / step) * step).toFixed(6);
+            const sLng = (Math.floor(lng / lngStep) * lngStep).toFixed(6);
+            const id = `${sLat}_${sLng}`;
+
+            if (!mapData[id] || mapData[id].uid !== myUID) {
+                mapData[id] = { color: myColor, uid: myUID };
+                socket.emit('claim', { id, color: myColor, uid: myUID });
+                renderMap();
+            }
         }
 
-        socket.on('init_map', (data) => { fullMapData = data; redrawCountries(); updateScore(); });
-        socket.on('pixel_updated', (data) => { fullMapData[data.id] = { color: data.color, owner: data.uid }; redrawCountries(); updateScore(); });
-        socket.on('online_stats', (count) => { document.getElementById('online-count').innerText = count; });
+        function renderMap() {
+            paintLayer.clearLayers();
+            const colorGroups = {};
 
+            for (let id in mapData) {
+                const c = mapData[id];
+                if (!colorGroups[c.color]) colorGroups[c.color] = [];
+                
+                const [lt, lg] = id.split('_').map(Number);
+                const lStep = step / Math.cos(lt * Math.PI / 180);
+
+                colorGroups[c.color].push(turf.polygon([[
+                    [lg, lt], [lg + lStep, lt], [lg + lStep, lt + step], [lg, lt + step], [lg, lt]
+                ]]));
+            }
+
+            for (let col in colorGroups) {
+                const dissolved = turf.dissolve(turf.featureCollection(colorGroups[col]));
+                L.geoJSON(dissolved, {
+                    style: { color: col, weight: 2, fillColor: col, fillOpacity: 0.5 }
+                }).addTo(paintLayer);
+            }
+            document.getElementById('score').innerText = Object.values(mapData).filter(x => x.uid === myUID).length;
+        }
+
+        // Выбор цвета
+        document.querySelectorAll('.c-node').forEach(n => {
+            n.onclick = () => {
+                document.querySelectorAll('.c-node').forEach(b => b.classList.remove('active'));
+                n.classList.add('active');
+                myColor = n.dataset.color;
+            }
+        });
+
+        socket.on('update', (data) => { mapData = data; renderMap(); });
     </script>
 </body>
 </html>
