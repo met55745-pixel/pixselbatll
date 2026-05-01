@@ -1,12 +1,15 @@
 {
-  "name": "pixel-battle-slh",
+  "name": "geometka-pro",
   "version": "1.0.0",
-  "main": "server.js",
+  "description": "Geo-Capture Game with Background Capsule",
+  "main": "index.html",
   "dependencies": {
-    "express": "^4.18.2",
-    "socket.io": "^4.7.2"
+    "@capacitor/android": "^5.0.0",
+    "@capacitor/cli": "^5.0.0",
+    "@capacitor/core": "^5.0.0",
+    "@capacitor-community/background-geolocation": "^1.2.14"
   },
   "scripts": {
-    "start": "node server.js"
+    "build": "mkdir -p www && cp index.html www/"
   }
 }
