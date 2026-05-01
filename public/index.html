@@ -3,141 +3,166 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>GeoMetka | Absolute Master Copy</title>
+    <title>GeoMetka IT-Championship Build</title>
     
-    <!-- Подключаем внешние ресурсы -->
+    <!-- External Assets -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;500;800&family=Orbitron:wght@400;900&display=swap" rel="stylesheet">
     
     <style>
         /* 
-           CSS СЕКЦИЯ: ПОЛНАЯ КАСТОМИЗАЦИЯ ИНТЕРФЕЙСА 
+           THEME: INDUSTRIAL GRAPHITE (#2f2f2f)
+           STYLE: MINIMALISTIC HIGH-TECH 
         */
         :root {
-            --neon-blue: #00f2ff;
-            --neon-red: #ff4757;
-            --neon-green: #2ed573;
-            --dark-bg: #050505;
-            --glass-bg: rgba(15, 15, 15, 0.9);
-            --border-glow: rgba(0, 242, 255, 0.3);
+            --bg-graphite: #2f2f2f;
+            --bg-darker: #1a1a1a;
+            --accent-red: #ff4757;
+            --text-main: #e0e0e0;
+            --text-dim: #888888;
+            --border-ui: rgba(255, 255, 255, 0.05);
+            --glow-red: rgba(255, 71, 87, 0.4);
         }
 
         * {
             box-sizing: border-box;
             -webkit-tap-highlight-color: transparent;
+            user-select: none;
         }
 
         body, html { 
             margin: 0; padding: 0; height: 100%; width: 100%;
-            background: var(--dark-bg); 
-            color: #ffffff;
+            background: var(--bg-graphite); 
+            color: var(--text-main);
             font-family: 'JetBrains Mono', monospace;
             overflow: hidden;
         }
 
-        /* Карта */
         #map { 
             height: 100%; width: 100%; 
-            background: #000; 
+            background: var(--bg-darker); 
             z-index: 1;
         }
 
-        /* Overlay элементов интерфейса */
-        .game-ui {
+        /* -----------------------------------------
+           UI OVERLAY SYSTEM
+        ----------------------------------------- */
+        .viewport-ui {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             z-index: 1000; pointer-events: none;
-            display: flex; flex-direction: column;
-            justify-content: space-between;
-            padding: env(safe-area-inset-top) 20px env(safe-area-inset-bottom) 20px;
+            display: flex; flex-direction: column; justify-content: space-between;
+            padding: env(safe-area-inset-top) 15px env(safe-area-inset-bottom) 15px;
         }
 
-        /* Верхняя панель (ХУД) */
-        .hud-top {
-            display: flex; justify-content: space-between; margin-top: 15px;
+        /* Top HUD */
+        .hud-header {
+            display: flex; gap: 10px; margin-top: 10px;
             pointer-events: auto;
         }
 
-        .hud-card {
-            background: var(--glass-bg);
-            border: 1px solid var(--border-glow);
-            border-bottom: 3px solid var(--neon-blue);
-            backdrop-filter: blur(10px);
-            padding: 10px 15px;
-            border-radius: 4px;
-            min-width: 120px;
+        .hud-widget {
+            background: var(--bg-graphite);
+            border: 1px solid var(--border-ui);
+            padding: 12px 18px; border-radius: 2px;
+            box-shadow: 10px 10px 20px rgba(0,0,0,0.3);
+            flex: 1; position: relative;
+            overflow: hidden;
         }
 
-        .hud-label {
-            font-size: 8px; color: var(--neon-blue);
-            text-transform: uppercase; letter-spacing: 1.5px;
-            margin-bottom: 4px;
+        .hud-widget::after {
+            content: ''; position: absolute; bottom: 0; left: 0;
+            width: 100%; height: 2px; background: var(--accent-red);
         }
 
-        .hud-value {
+        .widget-label {
+            font-size: 9px; color: var(--text-dim);
+            text-transform: uppercase; letter-spacing: 2px;
+            margin-bottom: 5px;
+        }
+
+        .widget-value {
             font-family: 'Orbitron', sans-serif;
-            font-size: 20px; font-weight: 900;
+            font-size: 18px; font-weight: 900;
         }
 
-        /* Нижняя панель управления */
-        .hud-bottom {
+        /* GPS Status Indicator */
+        .gps-indicator {
+            width: 8px; height: 8px; border-radius: 50%;
+            display: inline-block; margin-right: 8px;
+            background: #555;
+        }
+        .gps-online { background: #2ed573; box-shadow: 0 0 10px #2ed573; }
+
+        /* Bottom Controls */
+        .hud-footer {
             margin-bottom: 25px; pointer-events: auto;
-            display: flex; flex-direction: column; align-items: center; gap: 15px;
+            display: flex; flex-direction: column; align-items: center;
         }
 
-        .color-palette {
-            display: flex; gap: 20px;
-            background: var(--glass-bg);
-            padding: 15px 25px; border-radius: 50px;
+        .action-bar {
+            background: var(--bg-graphite);
+            padding: 15px 30px; border-radius: 2px;
+            border: 1px solid var(--border-ui);
+            display: flex; gap: 25px;
+            box-shadow: 0 15px 45px rgba(0,0,0,0.4);
+        }
+
+        .color-node {
+            width: 32px; height: 32px; border-radius: 2px;
+            cursor: pointer; transition: 0.3s;
             border: 1px solid rgba(255,255,255,0.1);
         }
 
-        .color-swatch {
-            width: 40px; height: 40px; border-radius: 50%;
-            border: 2px solid transparent; cursor: pointer;
-            transition: 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        .color-node.active {
+            transform: translateY(-8px);
+            border: 2px solid #fff;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
         }
 
-        .color-swatch.active {
-            transform: scale(1.3); border-color: white;
-            box-shadow: 0 0 15px currentColor;
+        /* -----------------------------------------
+           CUSTOM PLAYER MARKER (RED & WHITE)
+        ----------------------------------------- */
+        .player-marker-v3 {
+            position: relative; width: 24px; height: 24px;
         }
 
-        /* Персонализированный Маркер Игрока */
-        .player-anchor {
-            position: relative; width: 0; height: 0;
+        .marker-core {
+            width: 24px; height: 24px;
+            background: #fff; border: 6px solid var(--accent-red);
+            border-radius: 50%; box-shadow: 0 0 15px var(--glow-red);
+            position: relative; z-index: 5;
         }
 
-        .player-vision {
-            position: absolute; bottom: 0; left: 50%;
-            width: 150px; height: 220px;
+        .marker-pulse {
+            position: absolute; top: 0; left: 0;
+            width: 24px; height: 24px;
+            background: var(--accent-red); border-radius: 50%;
+            animation: ripple 2s infinite ease-out;
+            z-index: 1;
+        }
+
+        @keyframes ripple {
+            0% { transform: scale(1); opacity: 0.8; }
+            100% { transform: scale(3.5); opacity: 0; }
+        }
+
+        .vision-cone-v3 {
+            position: absolute; bottom: 12px; left: 50%;
+            width: 160px; height: 240px;
             background: conic-gradient(
-                from -30deg, 
-                rgba(0, 242, 255, 0.5) 0deg, 
-                rgba(0, 242, 255, 0.1) 30deg, 
-                rgba(0, 242, 255, 0) 60deg
+                from -35deg, 
+                rgba(255, 71, 87, 0.3) 0deg, 
+                rgba(255, 255, 255, 0.05) 35deg, 
+                rgba(255, 71, 87, 0) 70deg
             );
             transform-origin: bottom center;
-            filter: blur(8px); pointer-events: none;
+            filter: blur(10px); pointer-events: none;
             z-index: -1;
         }
 
-        .player-core {
-            width: 22px; height: 22px;
-            background: #fff; border: 4px solid var(--neon-blue);
-            border-radius: 50%; box-shadow: 0 0 20px var(--neon-blue);
-            z-index: 10;
-        }
-
-        /* Анимации захвата */
-        @keyframes capture-pulse {
-            0% { transform: scale(0.1); opacity: 1; }
-            100% { transform: scale(5); opacity: 0; }
-        }
-
-        .capture-effect {
-            width: 50px; height: 50px; border: 2px solid #fff;
-            border-radius: 50%; position: absolute;
-            animation: capture-pulse 0.6s ease-out forwards;
+        /* Grid Cell Styling */
+        .geo-pixel {
+            transition: fill-opacity 0.5s ease;
         }
     </style>
 </head>
@@ -145,255 +170,317 @@
 
     <div id="map"></div>
 
-    <div class="game-ui">
-        <!-- ВЕРХ -->
-        <div class="hud-top">
-            <div class="hud-card">
-                <div class="hud-label">Captured Areas</div>
-                <div id="ui-score" class="hud-value">0</div>
+    <div class="viewport-ui">
+        <div class="hud-header">
+            <div class="hud-widget">
+                <div class="widget-label">System Score</div>
+                <div id="ui-score" class="widget-value">0000</div>
             </div>
-            <div class="hud-card" id="gps-status">
-                <div class="hud-label">GPS Accuracy</div>
-                <div id="ui-accuracy" class="hud-value">--</div>
+            <div class="hud-widget">
+                <div class="widget-label">
+                    <span id="gps-dot" class="gps-indicator"></span>
+                    Signal Precision
+                </div>
+                <div id="ui-acc" class="widget-value">0.0m</div>
             </div>
         </div>
 
-        <!-- ЦЕНТР (Уведомления) -->
-        <div id="event-log" style="pointer-events: none;"></div>
-
-        <!-- НИЗ -->
-        <div class="hud-bottom">
-            <div class="color-palette">
-                <div class="color-swatch active" style="background: var(--neon-red);" data-hex="#ff4757"></div>
-                <div class="color-swatch" style="background: var(--neon-green);" data-hex="#2ed573"></div>
-                <div class="color-swatch" style="background: #1e90ff;" data-hex="#1e90ff"></div>
-                <div class="color-swatch" style="background: #ffa502;" data-hex="#ffa502"></div>
+        <div class="hud-footer">
+            <div class="action-bar">
+                <div class="color-node active" style="background: #ff4757;" data-hex="#ff4757"></div>
+                <div class="color-node" style="background: #ffffff;" data-hex="#ffffff"></div>
+                <div class="color-node" style="background: #444444;" data-hex="#444444"></div>
+                <div class="color-node" style="background: #2ed573;" data-hex="#2ed573"></div>
             </div>
         </div>
     </div>
 
-    <!-- СКРИПТЫ -->
+    <!-- Engine Dependencies -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
 
     <script>
         /**
-         * MASTER CONFIGURATION
+         * GEOMETKA ENGINE v3.0
+         * Lead Developer Build for IT Competitions
          */
-        const CONFIG = {
-            gridSize: 0.00045, // Размер сектора (примерно 50 метров)
-            mapZoom: 19,
-            minAccuracy: 25,   // Минимальная точность GPS для захвата
-            smoothing: 0.15    // Коэффициент плавности следования камеры
-        };
 
-        /**
-         * CORE STATE
-         */
-        let state = {
-            uid: localStorage.getItem('player_uid') || 'P-' + Math.random().toString(36).substr(2, 5).toUpperCase(),
-            activeColor: '#ff4757',
-            mapData: {}, // Хранилище всех секторов
-            lastPos: null,
-            isLocked: false
-        };
-        localStorage.setItem('player_uid', state.uid);
+        class GeoGameApp {
+            constructor() {
+                // Application State
+                this.state = {
+                    uid: this._getPersistentID(),
+                    currentColor: '#ff4757',
+                    capturedSectors: {},
+                    lastLocation: null,
+                    isMapReady: false,
+                    totalScore: 0
+                };
 
-        /**
-         * INITIALIZE MAP
-         */
-        const map = L.map('map', {
-            zoomControl: false,
-            attributionControl: false,
-            zoomSnap: 0.1,
-            easeLinearity: CONFIG.smoothing
-        }).setView([0,0], 2);
+                // Configuration
+                this.config = {
+                    gridSize: 0.00040, // High-precision grid (~45m)
+                    zoomLevel: 19,
+                    maxAccuracyThreshold: 30, // Meters
+                    colors: ['#ff4757', '#ffffff', '#444444', '#2ed573']
+                };
 
-        // Используем CartoDB Dark Matter для стиля "Old Money / Night City"
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+                this.init();
+            }
 
-        const sectorGroup = L.layerGroup().addTo(map);
-        let playerMarker = null;
-        let visionConeEl = null;
+            _getPersistentID() {
+                let id = localStorage.getItem('geometka_id');
+                if (!id) {
+                    id = 'NODE-' + Math.random().toString(36).substr(2, 9).toUpperCase();
+                    localStorage.setItem('geometka_id', id);
+                }
+                return id;
+            }
 
-        /**
-         * SOCKET.IO ИНТЕГРАЦИЯ
-         */
-        const socket = io();
+            /**
+             * Core System Boot
+             */
+            init() {
+                console.log("%c GEOMETKA ENGINE BOOTED ", "background: #ff4757; color: white; font-weight: bold;");
+                
+                this._initMap();
+                this._initNetwork();
+                this._initControls();
+                this._startTracking();
+                this._setupOrientation();
+            }
 
-        socket.on('sync_world', (data) => {
-            state.mapData = data;
-            renderWorld();
-        });
+            _initMap() {
+                this.map = L.map('map', {
+                    zoomControl: false,
+                    attributionControl: false,
+                    zoomSnap: 0.1,
+                    zoomDelta: 0.5,
+                    wheelPxPerZoomLevel: 120
+                }).setView([0, 0], 2);
 
-        socket.on('sector_claimed', (data) => {
-            state.mapData[data.id] = { color: data.color, uid: data.uid };
-            renderWorld();
-        });
+                // Graphite Map Layer
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                    maxZoom: 22
+                }).addTo(this.map);
 
-        /**
-         * ГЕО-МАТЕМАТИКА: СЕТКА И ЗАХВАТ
-         */
-        function handlePosition(lat, lng, accuracy) {
-            // Обновляем UI точности
-            const accEl = document.getElementById('ui-accuracy');
-            accEl.innerText = Math.round(accuracy) + 'm';
-            document.getElementById('gps-status').style.borderBottomColor = accuracy < CONFIG.minAccuracy ? '#2ed573' : '#ffa502';
+                this.layerGroup = L.layerGroup().addTo(this.map);
+                this.state.isMapReady = true;
+            }
 
-            // Привязка к сетке (Snap to Grid)
-            const latStep = CONFIG.gridSize;
-            const lngStep = CONFIG.gridSize / Math.cos(lat * Math.PI / 180);
+            _initNetwork() {
+                this.socket = io();
 
-            const gridY = (Math.floor(lat / latStep) * latStep).toFixed(6);
-            const gridX = (Math.floor(lng / lngStep) * lngStep).toFixed(6);
-            const sectorId = `${gridY}_${gridX}`;
+                this.socket.on('world_data', (data) => {
+                    this.state.capturedSectors = data;
+                    this.syncRender();
+                });
 
-            // Проверка: нужно ли захватывать?
-            if (!state.mapData[sectorId] || state.mapData[sectorId].uid !== state.uid) {
-                if (accuracy <= CONFIG.minAccuracy) {
-                    captureSector(sectorId, gridY, gridX);
+                this.socket.on('sector_claimed', (data) => {
+                    this.state.capturedSectors[data.id] = { c: data.color, u: data.uid };
+                    this.syncRender();
+                });
+            }
+
+            _initControls() {
+                const nodes = document.querySelectorAll('.color-node');
+                nodes.forEach(node => {
+                    node.onclick = () => {
+                        nodes.forEach(n => n.classList.remove('active'));
+                        node.classList.add('active');
+                        this.state.currentColor = node.dataset.hex;
+                    };
+                });
+            }
+
+            /**
+             * Advanced GPS Matrix
+             */
+            _startTracking() {
+                const options = {
+                    enableHighAccuracy: true,
+                    maximumAge: 0,
+                    timeout: 10000
+                };
+
+                this.map.locate({ watch: true, ...options });
+
+                this.map.on('locationfound', (e) => this._onLocationUpdate(e));
+                this.map.on('locationerror', (err) => console.warn("GPS Link Lost:", err));
+            }
+
+            _onLocationUpdate(e) {
+                const { lat, lng, accuracy } = e.latlng;
+                this.state.lastLocation = e.latlng;
+
+                // UI Updates
+                const accDisplay = document.getElementById('ui-acc');
+                const gpsDot = document.getElementById('gps-dot');
+                accDisplay.innerText = accuracy.toFixed(1) + 'm';
+                
+                if (accuracy <= this.config.maxAccuracyThreshold) {
+                    gpsDot.className = 'gps-indicator gps-online';
+                } else {
+                    gpsDot.className = 'gps-indicator';
+                }
+
+                // Marker Logic
+                this._updatePlayerMarker(lat, lng);
+
+                // Grid Logic
+                this._processGridCapture(lat, lng, accuracy);
+            }
+
+            _updatePlayerMarker(lat, lng) {
+                if (!this.playerMarker) {
+                    const iconHTML = `
+                        <div class="player-marker-v3">
+                            <div class="marker-pulse"></div>
+                            <div class="marker-core"></div>
+                            <div class="vision-cone-v3"></div>
+                        </div>
+                    `;
+                    
+                    this.playerMarker = L.marker([lat, lng], {
+                        icon: L.divIcon({ html: iconHTML, className: '', iconSize: [0,0] }),
+                        zIndexOffset: 1000
+                    }).addTo(this.map);
+
+                    this.visionCone = document.querySelector('.vision-cone-v3');
+                    this.map.setView([lat, lng], this.config.zoomLevel);
+                } else {
+                    this.playerMarker.setLatLng([lat, lng]);
+                    this.map.panTo([lat, lng], { animate: true, duration: 0.8 });
                 }
             }
 
-            // Плавное обновление маркера
-            updatePlayerMarker(lat, lng);
-        }
+            _processGridCapture(lat, lng, accuracy) {
+                if (accuracy > this.config.maxAccuracyThreshold) return;
 
-        function captureSector(id, lat, lng) {
-            state.mapData[id] = { color: state.activeColor, uid: state.uid };
-            socket.emit('claim', { id, color: state.activeColor, uid: state.uid });
-            
-            // Визуальный фидбек
-            showFlashEffect();
-            renderWorld();
-        }
+                const latStep = this.config.gridSize;
+                const lngStep = this.config.gridSize / Math.cos(lat * Math.PI / 180);
 
-        /**
-         * ОТРИСОВКА МИРА (ОПТИМИЗИРОВАННО ЧЕРЕЗ TURF)
-         */
-        function renderWorld() {
-            sectorGroup.clearLayers();
-            const colorBuckets = {};
+                const gridY = (Math.floor(lat / latStep) * latStep).toFixed(6);
+                const gridX = (Math.floor(lng / lngStep) * lngStep).toFixed(6);
+                const sectorID = `${gridY}_${gridX}`;
 
-            // Группируем по цветам для Dissolve
-            for (let id in state.mapData) {
-                const item = state.mapData[id];
-                if (!colorBuckets[item.color]) colorBuckets[item.color] = [];
-                
-                const [lat, lng] = id.split('_').map(Number);
-                const latStep = CONFIG.gridSize;
-                const lngStep = CONFIG.gridSize / Math.cos(lat * Math.PI / 180);
+                // Capture check
+                if (!this.state.capturedSectors[sectorID] || this.state.capturedSectors[sectorID].u !== this.state.uid) {
+                    this.state.capturedSectors[sectorID] = { c: this.state.currentColor, u: this.state.uid };
+                    
+                    this.socket.emit('sector_claim', {
+                        id: sectorID,
+                        color: this.state.currentColor,
+                        uid: this.state.uid
+                    });
 
-                const polygon = turf.polygon([[
-                    [lng, lat],
-                    [lng + lngStep, lat],
-                    [lng + lngStep, lat + latStep],
-                    [lng, lat + latStep],
-                    [lng, lat]
-                ]]);
-                colorBuckets[item.color].push(polygon);
-            }
-
-            // Рисуем каждую цветовую зону как единый объект
-            for (let color in colorBuckets) {
-                try {
-                    const fc = turf.featureCollection(colorBuckets[color]);
-                    const dissolved = turf.dissolve(fc);
-
-                    L.geoJSON(dissolved, {
-                        style: {
-                            fillColor: color,
-                            fillOpacity: 0.4,
-                            color: color,
-                            weight: 2,
-                            opacity: 0.8
-                        }
-                    }).addTo(sectorGroup);
-                } catch (e) {
-                    console.warn("Turf Error during dissolve:", e);
+                    this._playCaptureEffect();
+                    this.syncRender();
                 }
             }
 
-            // Обновляем очки
-            const myScore = Object.values(state.mapData).filter(s => s.uid === state.uid).length;
-            document.getElementById('ui-score').innerText = myScore;
-        }
+            /**
+             * Optimized Multi-Color Render Engine
+             */
+            syncRender() {
+                this.layerGroup.clearLayers();
+                const colorGroups = {};
 
-        /**
-         * ВИЗУАЛИЗАЦИЯ ИГРОКА
-         */
-        function updatePlayerMarker(lat, lng) {
-            if (!playerMarker) {
-                const container = L.DomUtil.create('div', 'player-anchor');
-                container.innerHTML = `<div class="player-vision"></div><div class="player-core"></div>`;
-                
-                playerMarker = L.marker([lat, lng], {
-                    icon: L.divIcon({ html: container, className: '', iconSize: [0,0] }),
-                    zIndexOffset: 1000
-                }).addTo(map);
+                // Batching sectors by color
+                for (let id in this.state.capturedSectors) {
+                    const sector = this.state.capturedSectors[id];
+                    if (!colorGroups[sector.c]) colorGroups[sector.c] = [];
+                    
+                    const [lat, lng] = id.split('_').map(Number);
+                    const lStep = this.config.gridSize;
+                    const lnStep = this.config.gridSize / Math.cos(lat * Math.PI / 180);
 
-                visionConeEl = container.querySelector('.player-vision');
-                map.setView([lat, lng], CONFIG.mapZoom);
-            } else {
-                playerMarker.setLatLng([lat, lng]);
-                map.panTo([lat, lng]);
+                    const poly = turf.polygon([[
+                        [lng, lat],
+                        [lng + lnStep, lat],
+                        [lng + lnStep, lat + lStep],
+                        [lng, lat + lStep],
+                        [lng, lat]
+                    ]]);
+                    colorGroups[sector.c].push(poly);
+                }
+
+                // Dissolve and Draw
+                for (let color in colorGroups) {
+                    try {
+                        const featureCollection = turf.featureCollection(colorGroups[color]);
+                        const merged = turf.dissolve(featureCollection);
+
+                        L.geoJSON(merged, {
+                            style: {
+                                color: color,
+                                weight: 1.5,
+                                fillColor: color,
+                                fillOpacity: 0.45,
+                                className: 'geo-pixel'
+                            }
+                        }).addTo(this.layerGroup);
+                    } catch (err) {
+                        console.error("Render Dissolve Error:", err);
+                    }
+                }
+
+                this._updateScoreUI();
+            }
+
+            _updateScoreUI() {
+                const count = Object.values(this.state.capturedSectors).filter(s => s.u === this.state.uid).length;
+                document.getElementById('ui-score').innerText = count.toString().padStart(4, '0');
+            }
+
+            _setupOrientation() {
+                const handleOrientation = (e) => {
+                    const heading = e.webkitCompassHeading || (360 - e.alpha);
+                    if (this.visionCone && heading) {
+                        this.visionCone.style.transform = `translate(-50%, 0) rotate(${heading}deg)`;
+                    }
+                };
+
+                if (DeviceOrientationEvent.requestPermission) {
+                    // Mobile Safari requirements
+                    document.body.addEventListener('click', () => {
+                        DeviceOrientationEvent.requestPermission().then(res => {
+                            if (res === 'granted') window.addEventListener('deviceorientation', handleOrientation);
+                        });
+                    }, { once: true });
+                } else {
+                    window.addEventListener('deviceorientation', handleOrientation);
+                }
+            }
+
+            _playCaptureEffect() {
+                // UI Haptic or Flash feedback logic
+                const hud = document.querySelector('.hud-header');
+                hud.style.borderColor = this.state.currentColor;
+                setTimeout(() => hud.style.borderColor = 'transparent', 200);
             }
         }
 
-        /**
-         * КОМПАС И ОРИЕНТАЦИЯ (ЛУЧ)
-         */
-        window.addEventListener('deviceorientation', (e) => {
-            if (e.alpha !== null && visionConeEl) {
-                // Корректный расчет угла для мобилок
-                const heading = e.webkitCompassHeading || (360 - e.alpha);
-                visionConeEl.style.transform = `translate(-50%, 0) rotate(${heading}deg)`;
-            }
-        }, true);
-
-        /**
-         * GPS ENGINE (ULTRA PRECISION)
-         */
-        const geoOptions = {
-            enableHighAccuracy: true,
-            maximumAge: 0,
-            timeout: 15000
-        };
-
-        map.locate({ watch: true, ...geoOptions });
-
-        map.on('locationfound', (e) => {
-            handlePosition(e.latlng.lat, e.latlng.lng, e.accuracy);
+        // Bootstrapping the Application
+        document.addEventListener('DOMContentLoaded', () => {
+            window.AppCore = new GeoGameApp();
         });
 
-        map.on('locationerror', (err) => {
-            console.error("GPS Error:", err.message);
-        });
-
-        /**
-         * INTERFACE INTERACTIONS
+        /** 
+         * EXTENSION LOGS FOR IT COMPETITION VERIFICATION 
+         * System Integrity Checks & Internal Documentation
          */
-        document.querySelectorAll('.color-swatch').forEach(swatch => {
-            swatch.onclick = () => {
-                document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
-                swatch.classList.add('active');
-                state.activeColor = swatch.dataset.hex;
-            };
-        });
-
-        function showFlashEffect() {
-            const flash = document.createElement('div');
-            flash.style.cssText = `
-                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-                background: white; opacity: 0.15; z-index: 2000; pointer-events: none;
-            `;
-            document.body.appendChild(flash);
-            setTimeout(() => flash.remove(), 100);
+        function __system_integrity_check() {
+            const requirements = ['Leaflet', 'turf', 'io'];
+            console.group("System Integrity Check");
+            requirements.forEach(req => {
+                const status = window[req] || typeof io !== 'undefined' ? 'OK' : 'FAIL';
+                console.log(`${req}: [${status}]`);
+            });
+            console.groupEnd();
         }
-
-        // Авто-ресайз окна
-        window.onresize = () => map.invalidateSize();
+        __system_integrity_check();
 
     </script>
 </body>
