@@ -15,7 +15,6 @@
         body, html { margin: 0; padding: 0; height: 100%; background: var(--dark); overflow: hidden; }
         #map { height: 100vh; width: 100vw; background: #000; }
 
-        /* Стеклянные карточки UI */
         .glass-card {
             background: var(--glass);
             backdrop-filter: blur(15px);
@@ -45,7 +44,6 @@
         }
         .color-node.active { border-color: white; transform: scale(1.1); }
 
-        /* Твой новый курсор — Красная точка */
         .red-dot {
             width: 14px; height: 14px; background: #ff4757; 
             border: 3px solid white; border-radius: 50%;
@@ -86,10 +84,13 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    
     <script>
-        const socket = io();
-        const gridSize = 0.0003; // Чуть уменьшил размер клетки для кучности
+        // ИСПРАВЛЕННЫЙ АДРЕС СЕРВЕРА
+        const socket = io('https://pixselbatll.onrender.com');
+        
+        const gridSize = 0.0003; 
         let myUID = localStorage.getItem('p_uid') || 'U' + Math.floor(Math.random()*9999);
         localStorage.setItem('p_uid', myUID);
 
@@ -135,14 +136,12 @@
             document.getElementById('my-score').innerText = count;
         }
 
-        // Слежение за позицией
         map.locate({ watch: true, enableHighAccuracy: true, maximumAge: 0 });
 
         map.on('locationfound', (e) => {
             const { lat, lng } = e.latlng;
             lastPos = e.latlng;
 
-            // Обновляем маркер (Красная точка)
             if (!myMarker) {
                 myMarker = L.marker([lat, lng], {
                     icon: L.divIcon({ className: 'red-dot', iconSize: [14, 14] }),
@@ -153,15 +152,12 @@
                 myMarker.setLatLng([lat, lng]);
             }
 
-            // Отправляем на сервер
             socket.emit('update_position', { uid: myUID, lat, lng, color: currentColor });
 
-            // Логика закрашивания
             const gLat = Math.floor(lat / gridSize) * gridSize;
             const gLng = Math.floor(lng / gridSize) * gridSize;
             const pId = `${gLat.toFixed(6)}_${gLng.toFixed(6)}`;
             
-            // Если клетка пустая или не наша — красим
             if (!fullMapData[pId] || fullMapData[pId].owner !== myUID) {
                 socket.emit('paint_pixel', { id: pId, color: currentColor, uid: myUID });
             }
@@ -170,4 +166,4 @@
         socket.on('online_stats', (count) => { document.getElementById('online-count').innerText = count; });
     </script>
 </body>
-</html>
+</html>е карточки UI 
